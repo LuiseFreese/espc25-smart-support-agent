@@ -1,0 +1,103 @@
+// Query 1: Function execution failures
+requests
+| where success == false
+| where operation_Name startswith "GetOrderStatus" or operation_Name startswith "CreateTicket"
+| project timestamp, operation_Name, resultCode, duration, customDimensions
+| order by timestamp desc
+| take 50
+
+// Query 2: Latency by operation
+requests
+| where success == true
+| summarize
+    avg_duration = avg(duration),
+    p50 = percentile(duration, 50),
+    p95 = percentile(duration, 95),
+    p99 = percentile(duration, 99),
+    count = count()
+  by operation_Name
+| order by avg_duration desc
+
+// Query 3: Tool invocations
+customEvents
+| where name in ("OrderStatusRetrieved", "TicketCreated")
+| project
+    timestamp,
+    name,
+    orderId = tostring(customDimensions.orderId),
+    ticketId = tostring(customDimensions.ticketId),
+    customerId = tostring(customDimensions.customerId),
+    status = tostring(customDimensions.status)
+| order by timestamp desc
+| take 100
+
+// Query 4: Agent conversation traces (correlation)
+traces
+| where message has "tool" or message has "agent"
+| project timestamp, message, operation_Id, severityLevel
+| order by timestamp desc
+| take 200
+
+// Query 5: Error rate over time
+requests
+| summarize
+    total = count(),
+    failures = countif(success == false)
+  by bin(timestamp, 15m)
+| extend error_rate = (failures * 100.0) / total
+| project timestamp, error_rate, total, failures
+| order by timestamp desc
+| take 96  // Last 24 hours at 15-min bins
+
+// Query 6: Token usage (custom metrics from agent)
+customMetrics
+| where name in ("tokens_input", "tokens_output")
+| summarize
+    total_tokens = sum(value)
+  by bin(timestamp, 1h), name
+| render timechart
+
+// Query 7: End-to-end Logic App runs
+traces
+| where message has "Logic App"
+| extend
+    workflow = tostring(customDimensions.workflowName),
+    runId = tostring(customDimensions.runId),
+    status = tostring(customDimensions.status)
+| project timestamp, workflow, runId, status, message
+| order by timestamp desc
+
+// Query 8: Search query patterns
+customEvents
+| where name == "SearchQuery"
+| extend query = tostring(customDimensions.query)
+| summarize count() by query
+| order by count_ desc
+| take 20
+
+// Query 9: Response quality indicators
+customEvents
+| where name == "ResponseGenerated"
+| extend
+    hasCitations = tobool(customDimensions.hasCitations),
+    citationCount = toint(customDimensions.citationCount),
+    answerLength = toint(customDimensions.answerLength)
+| summarize
+    avg_citations = avg(citationCount),
+    avg_length = avg(answerLength),
+    pct_with_citations = countif(hasCitations) * 100.0 / count()
+  by bin(timestamp, 1h)
+| order by timestamp desc
+
+// Query 10: Dependencies (external calls)
+dependencies
+| where type in ("HTTP", "Azure blob", "Azure table")
+| project
+    timestamp,
+    target,
+    name,
+    duration,
+    success,
+    resultCode
+| order by timestamp desc
+| take 100

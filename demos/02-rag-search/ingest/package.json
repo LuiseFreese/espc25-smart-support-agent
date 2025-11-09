@@ -1,0 +1,32 @@
+{
+  "name": "ingest-kb-search",
+  "version": "1.0.0",
+  "description": "Ingest knowledge base documents into Azure AI Search with embeddings",
+  "main": "dist/ingest.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/ingest.ts ../content",
+    "create-index": "ts-node src/ingest.ts --create-index",
+    "start": "node dist/ingest.js",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "azure",
+    "ai-search",
+    "embeddings",
+    "rag"
+  ],
+  "dependencies": {
+    "@azure/search-documents": "^12.0.0",
+    "@azure/identity": "^4.0.0",
+    "dotenv": "^16.3.1",
+    "pdf-parse": "^1.1.1",
+    "tiktoken": "^1.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pdf-parse": "^1.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

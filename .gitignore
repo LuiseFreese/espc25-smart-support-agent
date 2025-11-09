@@ -1,0 +1,66 @@
+# Azure deployment outputs
+deployment-output.json
+deploy-output.txt
+*.tmp
+*.bak
+.github/copilot-instructions.md
+
+
+# Planning/Roadmap (internal use)
+ROADMAP.md
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+
+# IDEs
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Azure Functions
+local.settings.json
+.azurefunctions/
+*.user
+
+# Test outputs
+coverage/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Prompt Flow
+.runs/
+
+# Build outputs
+build/
+out/

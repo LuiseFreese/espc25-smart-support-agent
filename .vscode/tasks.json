@@ -1,0 +1,111 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Deploy Infrastructure",
+      "type": "shell",
+      "command": "az deployment sub create --location eastus --template-file infra/main.bicep --parameters @infra/parameters.dev.json",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Run Demo 01 - Triage",
+      "type": "shell",
+      "command": "pf flow test -f demos/01-triage-promptflow/flow.dag.yaml --inputs ticket_text='VPN disconnects every 5 minutes'",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Run Demo 02 - Ingest KB",
+      "type": "shell",
+      "command": "cd demos/02-rag-search/ingest && npm install && npm run dev",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Run Demo 02 - RAG Flow",
+      "type": "shell",
+      "command": "pf flow test -f demos/02-rag-search/flow.dag.yaml --inputs question='How to reset my password?'",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Start Demo 03 - Functions",
+      "type": "shell",
+      "command": "cd demos/03-agent-with-tools/function-tool && npm install && npm start",
+      "problemMatcher": [],
+      "isBackground": true,
+      "group": "build"
+    },
+    {
+      "label": "Run Demo 03 - Agent",
+      "type": "shell",
+      "command": "cd demos/03-agent-with-tools/agent && npm install && npm run dev -- 'Where is order 12345?'",
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "type": "func",
+      "label": "func: host start",
+      "command": "host start",
+      "problemMatcher": "$func-node-watch",
+      "isBackground": true,
+      "dependsOn": "npm watch (functions)",
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "npm build (functions)",
+      "command": "npm run build",
+      "dependsOn": "npm clean (functions)",
+      "problemMatcher": "$tsc",
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "npm watch (functions)",
+      "command": "npm run watch",
+      "dependsOn": "npm clean (functions)",
+      "problemMatcher": "$tsc-watch",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "npm install (functions)",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "npm prune (functions)",
+      "command": "npm prune --production",
+      "dependsOn": "npm build (functions)",
+      "problemMatcher": [],
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "npm clean (functions)",
+      "command": "npm run clean",
+      "dependsOn": "npm install (functions)",
+      "options": {
+        "cwd": "${workspaceFolder}/demos\\03-agent-with-tools\\function-tool"
+      }
+    }
+  ]
+}

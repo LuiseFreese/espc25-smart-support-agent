@@ -1,0 +1,30 @@
+{
+  "name": "smart-agents-foundry",
+  "version": "1.0.0",
+  "description": "Azure AI Foundry Smart Support Agent - Demo repository",
+  "scripts": {
+    "demo01": "cd demos/01-triage-promptflow && pf flow test -f flow.dag.yaml --inputs ticket_text=\"VPN disconnects every 5 minutes\"",
+    "demo02:ingest": "cd demos/02-rag-search/ingest && npm run dev",
+    "demo02:flow": "cd demos/02-rag-search && pf flow test -f flow.dag.yaml --inputs question=\"How to reset my account password?\"",
+    "demo03:functions": "cd demos/03-agent-with-tools/function-tool && func start",
+    "demo03:agent": "cd demos/03-agent-with-tools/agent && npm run dev",
+    "infra:deploy": "az deployment sub create --location eastus --template-file infra/main.bicep --parameters @infra/parameters.dev.json",
+    "test": "echo \"Run individual demo tests\" && exit 0",
+    "lint": "echo \"Linting placeholder\" && exit 0"
+  },
+  "keywords": [
+    "azure",
+    "ai",
+    "foundry",
+    "prompt-flow",
+    "rag",
+    "agent",
+    "copilot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}

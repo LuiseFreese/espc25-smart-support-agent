@@ -1,0 +1,28 @@
+{
+  "name": "agent-client",
+  "version": "1.0.0",
+  "description": "TypeScript client for Azure OpenAI agent with function calling",
+  "main": "dist/call-agent.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/call-agent.ts",
+    "start": "node dist/call-agent.js",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "azure",
+    "openai",
+    "agent",
+    "function-calling"
+  ],
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "@azure/identity": "^4.0.0",
+    "openai": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,8 @@
+{"ticket_text": "VPN disconnects every 5 minutes", "expected_category": "Technical", "expected_priority": "Medium"}
+{"ticket_text": "Cannot access my billing dashboard", "expected_category": "Access", "expected_priority": "Medium"}
+{"ticket_text": "Entire production database is down", "expected_category": "Technical", "expected_priority": "High"}
+{"ticket_text": "Need refund for duplicate charge", "expected_category": "Billing", "expected_priority": "Medium"}
+{"ticket_text": "Forgot my password and can't login", "expected_category": "Account", "expected_priority": "Medium"}
+{"ticket_text": "Possible security breach detected", "expected_category": "Technical", "expected_priority": "High"}
+{"ticket_text": "Request new color theme option", "expected_category": "Technical", "expected_priority": "Low"}
+{"ticket_text": "Need manager role for project X", "expected_category": "Access", "expected_priority": "Low"}

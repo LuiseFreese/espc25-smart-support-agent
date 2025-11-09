@@ -1,0 +1,30 @@
+$schema: https://azuremlschemas.azureedge.net/promptflow/latest/Flow.schema.json
+environment:
+  python_requirements_txt: requirements.txt
+inputs:
+  ticket_text:
+    type: string
+    default: "My VPN keeps disconnecting every 5 minutes"
+outputs:
+  category:
+    type: string
+    reference: ${classify.output.category}
+  priority:
+    type: string
+    reference: ${classify.output.priority}
+nodes:
+- name: classify
+  type: llm
+  source:
+    type: code
+    path: prompts/classify.jinja2
+  inputs:
+    deployment_name: ${env:AZURE_OPENAI_DEPLOYMENT}
+    temperature: 0.0
+    top_p: 1.0
+    max_tokens: 200
+    response_format:
+      type: json_object
+    ticket_text: ${inputs.ticket_text}
+  connection: azure_openai_connection
+  api: chat

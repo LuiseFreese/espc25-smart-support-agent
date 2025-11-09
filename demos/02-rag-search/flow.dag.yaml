@@ -1,0 +1,40 @@
+$schema: https://azuremlschemas.azureedge.net/promptflow/latest/Flow.schema.json
+environment:
+  python_requirements_txt: requirements.txt
+inputs:
+  question:
+    type: string
+    default: "How do I reset my password?"
+outputs:
+  answer:
+    type: string
+    reference: ${answer.output}
+  citations:
+    type: list
+    reference: ${retrieve.output}
+nodes:
+- name: retrieve
+  type: python
+  source:
+    type: code
+    path: retrieve.py
+  inputs:
+    question: ${inputs.question}
+    search_endpoint: ${env:AZURE_AI_SEARCH_ENDPOINT}
+    search_key: ${env:AZURE_AI_SEARCH_API_KEY}
+    search_index: ${env:AZURE_AI_SEARCH_INDEX}
+    top_k: 5
+- name: answer
+  type: llm
+  source:
+    type: code
+    path: answer_prompt.jinja2
+  inputs:
+    deployment_name: ${env:AZURE_OPENAI_DEPLOYMENT}
+    temperature: 0.3
+    top_p: 0.95
+    max_tokens: 800
+    question: ${inputs.question}
+    contexts: ${retrieve.output}
+  connection: azure_openai_connection
+  api: chat
