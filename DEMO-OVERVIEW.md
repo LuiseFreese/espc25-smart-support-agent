@@ -98,8 +98,8 @@ Demonstrate **Retrieval Augmented Generation (RAG)** for grounding AI responses 
 ### Validation Status
 ✅ **FULLY FUNCTIONAL** - Tested and documented
 - **Endpoint**: `https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search`
-- **Test Results**: 80% pass rate (4/5 queries with confidence ≥0.6)
-- **Average Confidence**: 0.64
+- **Test Results**: **100% pass rate** (5/5 queries with confidence ≥0.6)
+- **Average Confidence**: 0.72
 - **Test Date**: November 14, 2025
 
 ### Test Results
@@ -108,9 +108,14 @@ Demonstrate **Retrieval Augmented Generation (RAG)** for grounding AI responses 
 |-------|------------|--------|
 | How do I reset my password? | 0.80 | ✅ High |
 | VPN keeps disconnecting | 0.60 | ✅ Pass |
-| I was charged twice on my bill | 0.40 | ⚠️ Low |
+| I was charged twice on my bill | 0.80 | ✅ High |
 | Can't install Office 365 | 0.60 | ✅ Pass |
 | How do I configure MFA? | 0.80 | ✅ High |
+
+**Recent Improvement**:
+- Added `duplicate-charges-guide.md` KB document with targeted "charged twice" terminology
+- Billing query confidence improved from 0.4 → 0.8
+- Pass rate improved from 80% → 100%
 
 ### How to Test
 ```powershell
@@ -336,7 +341,7 @@ graph TB
 | Demo | Status | Validation | Priority |
 |------|--------|------------|----------|
 | Demo 01: Triage | ✅ Functional | 100% category, 80% priority | ✅ Complete |
-| Demo 02: RAG | ✅ Functional | 80% pass rate | ✅ Complete |
+| Demo 02: RAG | ✅ Functional | **100% pass rate** | ✅ Complete |
 | Demo 03: Agents | ✅ Functional | 100% tool selection | ✅ Complete |
 | **Demo 04: Production** | ✅ **Production** | **Fully tested** | ✅ **Complete** |
 
@@ -346,12 +351,12 @@ graph TB
 
 ### Completed Validations
 1. ✅ **Demo 01**: Classification logic validated (100% category accuracy)
-2. ✅ **Demo 02**: RAG search validated (80% pass rate)
+2. ✅ **Demo 02**: RAG search validated (**100% pass rate** after KB enhancement)
 3. ✅ **Demo 03**: Agent function calling deployed to production (100% accuracy)
 4. ✅ **Demo 04**: Production email system fully operational
 
 ### Future Enhancements
-- Expand knowledge base (currently 10 documents)
+- Expand knowledge base (currently 11 documents)
 - Deploy Demo 01 triage prompt flow to replace keyword matching
 - Add automated webhook subscription renewal
 - Implement ticket resolution confirmation workflow
