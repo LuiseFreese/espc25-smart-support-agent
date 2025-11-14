@@ -7,6 +7,15 @@
     },
     "environmentName": {
       "value": "dev"
+    },
+    "graphClientId": {
+      "value": "YOUR_GRAPH_CLIENT_ID"
+    },
+    "graphClientSecret": {
+      "value": "YOUR_GRAPH_CLIENT_SECRET"
+    },
+    "graphTenantId": {
+      "value": "YOUR_TENANT_ID"
     }
   }
 }

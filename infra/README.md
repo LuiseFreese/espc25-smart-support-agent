@@ -1,27 +1,99 @@
 # Infrastructure Deployment
 
-This directory contains Bicep templates for deploying Azure resources required for the Smart Support Agent.
+This directory contains Bicep templates for deploying all Azure resources required for the Smart Support Agent.
 
-## Resources Deployed
+## Deployed Resources (Sweden Central)
 
-- **Azure AI Search** (Standard S1) - For knowledge base indexing and retrieval
-- **Storage Account** - For storing documents and function app data
-- **Log Analytics Workspace** - For centralized logging
-- **Application Insights** - For monitoring and telemetry
-- **App Service Plan** (Linux, B1) - For hosting Azure Functions
-- **Function App** (Node 20) - For tool execution endpoints
-- **Key Vault** - For secure credential storage
+```mermaid
+graph TB
+    subgraph "Resource Group: rg-smart-agents-dev"
+        A[Azure OpenAI<br/>oai-agents-*]
+        B[Azure AI Search<br/>srch-agents-*]
+        C[Function App<br/>func-agents-*<br/>Node.js 20]
+        D[Function App<br/>func-rag-*<br/>Python 3.11]
+        E[Storage Account<br/>stagents*]
+        F[AI Hub<br/>aihub-agents-*]
+        G[AI Project<br/>aiproject-agents-*]
+        H[App Insights<br/>appi-*]
+        I[Key Vault<br/>kv-agents-*]
+        J[Log Analytics<br/>log-agents-*]
+        K[App Service Plan<br/>plan-agents-*]
+    end
+    
+    C -.->|Hosted on| K
+    D -.->|Hosted on| K
+    C -->|Logs to| H
+    D -->|Logs to| H
+    H -->|Workspace| J
+    C -->|Secrets| I
+    C -->|Calls| A
+    D -->|Calls| A
+    D -->|Searches| B
+    C -->|Writes| E
+    G -.->|Part of| F
+    
+    style A fill:#00aa00,color:#fff
+    style B fill:#00aa00,color:#fff
+    style C fill:#0078d4,color:#fff
+    style D fill:#0078d4,color:#fff
+    style E fill:#50e6ff,color:#000
+```
 
-## Deployment Options
+### Resource Details
 
-### Option 1: Azure CLI
+| Resource | Type | SKU | Purpose |
+|----------|------|-----|---------|
+| `oai-agents-*` | Azure OpenAI Service | S0 | GPT-4o-mini, text-embedding-3-large deployments |
+| `srch-agents-*` | Azure AI Search | Standard S1 | Knowledge base indexing with vector search |
+| `func-agents-*` | Function App (Node.js 20) | Consumption | Email processing, triage, ticket creation |
+| `func-rag-*` | Function App (Python 3.11) | Consumption | RAG search with AI Search integration |
+| `stagents*` | Storage Account | Standard LRS | Table Storage for tickets |
+| `aihub-agents-*` | AI Hub | - | Unified AI management workspace |
+| `aiproject-agents-*` | AI Project | - | Project-level AI configurations |
+| `appi-*` | Application Insights | - | Telemetry and monitoring |
+| `kv-agents-*` | Key Vault | Standard | Secure secrets storage |
+| `log-agents-*` | Log Analytics | Pay-as-you-go | Centralized logging |
+| `plan-agents-*` | App Service Plan | B1 (Linux) | Hosting for function apps |
 
-```bash
+**Region**: Sweden Central (GPT-4o-mini availability)
+
+## Architecture
+
+```mermaid
+graph LR
+    A[main.bicep] --> B[modules/openai.bicep]
+    A --> C[modules/search.bicep]
+    A --> D[modules/function-app.bicep]
+    A --> E[modules/storage.bicep]
+    A --> F[modules/ai-hub.bicep]
+    A --> G[modules/ai-project.bicep]
+    A --> H[modules/app-insights.bicep]
+    A --> I[modules/key-vault.bicep]
+    
+    J[parameters.dev.json] -->|Parameters| A
+    
+    D -->|Requires| K[modules/hosting-plan.bicep]
+    
+    style A fill:#0078d4,color:#fff
+    style J fill:#ffb900,color:#000
+```
+
+## Deployment
+
+### Prerequisites
+
+- Azure subscription with appropriate permissions
+- Azure CLI 2.50+ or Azure PowerShell
+- Bicep CLI (included with Azure CLI)
+
+### Quick Deployment
+
+```powershell
 # Login to Azure
 az login
 az account set -s <subscription-id>
 
-# Create deployment
+# Deploy all resources
 az deployment sub create \
   --name smart-agents-deployment \
   --location eastus \
@@ -31,23 +103,45 @@ az deployment sub create \
 # Get outputs
 az deployment sub show \
   --name smart-agents-deployment \
-  --query properties.outputs
+  --query properties.outputs -o table
 ```
 
-### Option 2: Azure Developer CLI (azd)
+### Deployment Time
 
-```bash
-# Initialize (first time only)
-azd init
+- **Total**: ~8-12 minutes
+- AI Search: 3-4 minutes
+- OpenAI Service: 2-3 minutes
+- Function Apps: 2-3 minutes
+- Other resources: 2-3 minutes
 
-# Provision and deploy
-azd up
+## Configuration
 
-# Get environment variables
-azd env get-values
+### Parameters File (`parameters.dev.json`)
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": { "value": "dev" },
+    "location": { "value": "swedencentral" },
+    "graphClientId": { "value": "<app-registration-id>" },
+    "graphClientSecret": { "value": "<app-registration-secret>" },
+    "graphTenantId": { "value": "<tenant-id>" }
+  }
+}
 ```
 
-## Export Outputs to .env
+### Secure Parameters
+
+Sensitive values use `@secure()` decorator:
+
+```bicep
+@secure()
+param graphClientSecret string
+```
+
+These are not logged or exposed in deployment history.
 
 After deployment, extract the outputs and add them to your `.env` file:
 

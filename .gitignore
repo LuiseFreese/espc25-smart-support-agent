@@ -3,6 +3,7 @@ deployment-output.json
 deploy-output.txt
 *.tmp
 *.bak
+*.zip
 .github/copilot-instructions.md
 
 

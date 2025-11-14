@@ -225,6 +225,7 @@ Write-Host "║              🎉 DEPLOYMENT COMPLETE! 🎉                    �
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
 Write-Host "Next Steps:" -ForegroundColor Cyan
+
 Write-Host "1. Test Demo 01 (Triage):" -ForegroundColor White
 Write-Host "   python test-demo01.py" -ForegroundColor Gray
 Write-Host "`n2. Test Demo 02 (RAG Search):" -ForegroundColor White
@@ -238,7 +239,7 @@ Write-Host "`n📊 Resource Summary:" -ForegroundColor Cyan
 Write-Host "   - Azure OpenAI: gpt-4o-mini + text-embedding-3-large (with Managed Identity)" -ForegroundColor Gray
 Write-Host "   - Azure AI Search: $searchServiceName (3 docs indexed)" -ForegroundColor Gray
 Write-Host "   - Azure Functions: $functionAppName (GetOrderStatus, CreateTicket)" -ForegroundColor Gray
-Write-Host "   - Storage Account: $storageAccountName (Functions runtime)" -ForegroundColor Gray
+Write-Host "   - Storage Account: $storageAccountName (Table Storage for tickets)" -ForegroundColor Gray
 Write-Host "   - Managed Identity: Configured for OpenAI + Search + Key Vault" -ForegroundColor Gray
 
 Write-Host "`n✨ All resources deployed ✨`n" -ForegroundColor Green

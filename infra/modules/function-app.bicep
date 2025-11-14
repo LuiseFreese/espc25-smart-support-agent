@@ -5,6 +5,10 @@ param storageAccountName string
 param appInsightsConnectionString string
 param openAIEndpoint string = ''
 param searchEndpoint string = ''
+param graphClientId string = ''
+@secure()
+param graphClientSecret string = ''
+param graphTenantId string = ''
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageAccountName
@@ -53,6 +57,34 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'AZURE_CLIENT_ID'
           value: 'system'
+        }
+        {
+          name: 'STORAGE_ACCOUNT_NAME'
+          value: storageAccount.name
+        }
+        {
+          name: 'STORAGE_ACCOUNT_KEY'
+          value: storageAccount.listKeys().keys[0].value
+        }
+        {
+          name: 'GRAPH_CLIENT_ID'
+          value: graphClientId
+        }
+        {
+          name: 'GRAPH_CLIENT_SECRET'
+          value: graphClientSecret
+        }
+        {
+          name: 'GRAPH_TENANT_ID'
+          value: graphTenantId
+        }
+        {
+          name: 'RAG_ENDPOINT'
+          value: 'https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search'
+        }
+        {
+          name: 'TRIAGE_ENDPOINT'
+          value: 'https://triage-endpoint.eastus.inference.ml.azure.com/score'
         }
       ]
       cors: {

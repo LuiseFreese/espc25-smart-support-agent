@@ -19,6 +19,16 @@ param currentUserObjectId string = ''
 @description('Create role assignments (set to false if they already exist from previous deployment)')
 param createRoleAssignments bool = true
 
+@description('Microsoft Graph Client ID for email processing')
+param graphClientId string = ''
+
+@description('Microsoft Graph Client Secret for email processing')
+@secure()
+param graphClientSecret string = ''
+
+@description('Microsoft Graph Tenant ID')
+param graphTenantId string = ''
+
 var resourceGroupName = 'rg-smart-agents-${environmentName}'
 var searchServiceName = 'srch-agents-${resourceSuffix}'
 var storageAccountName = 'stagents${take(resourceSuffix, 16)}'
@@ -28,6 +38,8 @@ var functionAppName = 'func-agents-${resourceSuffix}'
 var hostingPlanName = 'plan-agents-${resourceSuffix}'
 var keyVaultName = 'kv-agents-${resourceSuffix}'
 var openAIName = 'oai-agents-${resourceSuffix}'
+var aiHubName = 'aihub-agents-${resourceSuffix}'
+var aiProjectName = 'aiproject-agents-${resourceSuffix}'
 
 // Resource Group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
@@ -100,6 +112,9 @@ module functionApp 'modules/function-app.bicep' = {
     appInsightsConnectionString: appInsights.outputs.connectionString
     openAIEndpoint: openAI.outputs.endpoint
     searchEndpoint: searchService.outputs.endpoint
+    graphClientId: graphClientId
+    graphClientSecret: graphClientSecret
+    graphTenantId: graphTenantId
   }
   dependsOn: [
     storageAccount
@@ -113,6 +128,34 @@ module keyVault 'modules/key-vault.bicep' = {
   params: {
     name: keyVaultName
     location: location
+  }
+}
+
+// AI Hub
+module aiHub 'modules/ai-hub.bicep' = {
+  name: 'aiHubDeployment'
+  scope: resourceGroup
+  params: {
+    name: aiHubName
+    location: location
+    friendlyName: 'Smart Support Agent AI Hub'
+    description: 'AI Hub for deploying RAG and triage prompt flows'
+    storageAccountId: storageAccount.outputs.id
+    keyVaultId: keyVault.outputs.id
+    appInsightsId: appInsights.outputs.id
+  }
+}
+
+// AI Project (child of AI Hub)
+module aiProject 'modules/ai-project.bicep' = {
+  name: 'aiProjectDeployment'
+  scope: resourceGroup
+  params: {
+    name: aiProjectName
+    location: location
+    friendlyName: 'Smart Support Agent Project'
+    description: 'AI Project for RAG and triage flows'
+    aiHubId: aiHub.outputs.id
   }
 }
 
@@ -158,3 +201,7 @@ output openAIEndpoint string = openAI.outputs.endpoint
 output openAIAccountName string = openAI.outputs.accountName
 output openAIGptDeployment string = openAI.outputs.gptDeploymentName
 output openAIEmbeddingDeployment string = openAI.outputs.embeddingDeploymentName
+output aiHubName string = aiHub.outputs.name
+output aiHubId string = aiHub.outputs.id
+output aiProjectName string = aiProject.outputs.name
+output aiProjectId string = aiProject.outputs.id
