@@ -53,11 +53,12 @@
 All demos have been validated and documented. See [DEMO-OVERVIEW.md](DEMO-OVERVIEW.md) for detailed resource mapping.
 
 | Demo | Status | Validation | Test Results |
-|------|--------|------------|--------------|
+|------|--------|------------|--------------||
 | **Demo 01: Triage** | ✅ Functional | 100% category, 80% priority | [README](demos/01-triage-promptflow/README.md) |
 | **Demo 02: RAG Search** | ✅ Functional | **100% pass rate** (avg 0.72 confidence) | [README](demos/02-rag-search/README.md) |
 | **Demo 03: Agents** | ✅ **DEPLOYED** | 100% tool selection | [README](demos/03-agent-with-tools/README.md) |
 | **Demo 04: Production** | ✅ **PRODUCTION** | Fully tested (webhook + RAG + tickets) | [README](demos/04-real-ticket-creation/function/README.md) |
+| **Demo 05: Copilot Plugin** | ✅ **READY** | Declarative plugin configured | [README](demos/05-copilot-plugin/README.md) |
 
 **Test Scripts:**
 - `tests/test-demo01-triage.py` - Classification accuracy (5 scenarios)
@@ -68,6 +69,7 @@ All demos have been validated and documented. See [DEMO-OVERVIEW.md](DEMO-OVERVI
 **Key Achievements:**
 - ✅ Demo 02 improved to 100% pass rate with targeted KB enhancements
 - ✅ Demo 03 functions deployed to production (GetOrderStatus, CreateTicket)
+- ✅ Demo 05 Copilot plugin created (addresses session requirement #3)
 - ✅ 100% tool selection accuracy with enhanced system prompt
 - ✅ All 4 production demos validated and documented
 

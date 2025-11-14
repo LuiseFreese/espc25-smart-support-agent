@@ -1,0 +1,41 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "a8d8c9e0-1234-5678-9abc-def012345678",
+  "packageName": "com.itsupport.agent",
+  "developer": {
+    "name": "IT Support Team",
+    "websiteUrl": "https://example.com",
+    "privacyUrl": "https://example.com/privacy",
+    "termsOfUseUrl": "https://example.com/terms"
+  },
+  "name": {
+    "short": "IT Support",
+    "full": "IT Support Knowledge Base Agent"
+  },
+  "description": {
+    "short": "Get instant help with IT support questions",
+    "full": "AI-powered IT support agent that answers questions about passwords, VPN, billing, software installation, email, calendar, account access, and more. Powered by Azure AI Foundry with retrieval augmented generation (RAG) for accurate, grounded responses."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0078D4",
+  "staticTabs": [
+    {
+      "entityId": "itsupport",
+      "name": "IT Support",
+      "contentUrl": "https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "func-rag-dw7z4hg4ssn2k.azurewebsites.net"
+  ]
+}

@@ -318,19 +318,106 @@ graph TB
 
 ---
 
+## Demo 05: Copilot Plugin for IT Support (M365 Integration)
+
+### Purpose
+Demonstrate **Microsoft 365 Copilot integration** with Azure AI Foundry agents using a declarative plugin. Shows how to extend Copilot with custom IT support capabilities that leverage the RAG function from Demo 02.
+
+### Azure Resources Used
+
+| Resource | Usage |
+|----------|-------|
+| **RAG Function** (`func-rag-dw7z4hg4ssn2k`) | Backend API called by Copilot |
+| **Azure AI Search** (`kb-support` index) | Knowledge base (via RAG function) |
+| **Azure OpenAI** | Embeddings + completions (via RAG function) |
+| **Microsoft 365 Copilot** | User interface and orchestration |
+| **Teams Admin Center** | App deployment and management |
+
+### Key Features
+- Declarative plugin (configuration-only, no code)
+- OpenAPI spec for RAG function
+- Conversation starters for common queries
+- Works across Teams, Outlook, Office, web
+- Automatic intent detection
+
+### Plugin Structure
+
+```
+appPackage/
+├── manifest.json        # Teams app manifest (v1.17 with Copilot extensions)
+├── ai-plugin.json       # Declarative plugin configuration
+├── openapi.json         # RAG function API specification
+├── color.png            # App icon 192x192
+└── outline.png          # App icon 32x32 outline
+```
+
+### Validation Status
+✅ **READY FOR DEPLOYMENT** - Plugin configured and packaged
+- **Package**: `ITSupportPlugin.zip` (4.3 KB)
+- **Deployment**: Sideload in Teams or deploy via Admin Center
+- **Status**: Ready for testing with M365 Copilot license
+
+### Conversation Starters
+
+| Starter | Expected Behavior |
+|---------|-------------------|
+| Reset my password | Triggers RAG search, returns password reset guide |
+| VPN troubleshooting | Triggers RAG search, returns VPN connection guide |
+| Billing issue | Triggers RAG search, returns duplicate charge resolution |
+| Install Office 365 | Triggers RAG search, returns software installation guide |
+
+### How to Deploy
+
+```powershell
+# Run deployment script
+cd demos/05-copilot-plugin
+.\deploy.ps1
+
+# Upload ITSupportPlugin.zip to Teams Admin Center
+# Configure FUNCTION_KEY secret in app settings
+# Install plugin in Copilot
+```
+
+### Integration with Other Demos
+
+- **Demo 02**: Uses RAG function as backend API
+- **Demo 03**: Could add CreateTicket action in Phase 2
+- **Demo 04**: Copilot could trigger email workflow
+
+### Session Alignment
+
+**Addresses ESPC25 Session Requirement #3:**
+> "Discover how to connect Azure AI Foundry with Copilot to bring AI solutions to life"
+
+✅ **Fully Implemented:**
+- Declarative Copilot plugin created
+- RAG function integrated with M365 Copilot
+- Demonstrates Azure AI Foundry → Copilot connection
+- Ready for live demo in presentation
+
+### Cost Impact
+
+**Additional Costs:**
+- Microsoft 365 Copilot license: $30/user/month (external to Azure)
+- No additional Azure costs (uses existing RAG function)
+
+---
+
 ## Demo Progression
 
 ### Recommended Learning Path
 
 1. **Demo 01** - Start with simple triage classification
 2. **Demo 02** - Add knowledge base search (RAG)
-3. **Demo 04** - Combine everything in production system
-4. **Demo 03** - Extend with function calling (advanced)
+3. **Demo 05** - Extend to Copilot with declarative plugin
+4. **Demo 04** - Combine everything in production system
+5. **Demo 03** - Extend with function calling (advanced)
 
 ### Skill Progression
 
 - **Beginner**: Demo 01 (Prompt engineering basics)
 - **Intermediate**: Demo 02 (RAG implementation)
+- **Intermediate+**: Demo 05 (Copilot plugin creation)
 - **Advanced**: Demo 03 (Agent function calling)
 - **Expert**: Demo 04 (Event-driven production architecture)
 
@@ -343,7 +430,8 @@ graph TB
 | Demo 01: Triage | ✅ Functional | 100% category, 80% priority | ✅ Complete |
 | Demo 02: RAG | ✅ Functional | **100% pass rate** | ✅ Complete |
 | Demo 03: Agents | ✅ Functional | 100% tool selection | ✅ Complete |
-| **Demo 04: Production** | ✅ **Production** | **Fully tested** | ✅ **Complete** |
+| Demo 04: Production | ✅ **Production** | **Fully tested** | ✅ Complete |
+| **Demo 05: Copilot Plugin** | ✅ **Ready** | **Plugin configured** | ✅ **Complete** |
 
 ---
 
