@@ -1,0 +1,30 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineDeployment.schema.json
+name: blue
+endpoint_name: triage-endpoint
+model:
+  path: .
+  properties:
+    azureml.promptflow.source_flow_id: triage-flow
+environment:
+  image: mcr.microsoft.com/azureml/promptflow/promptflow-runtime:latest
+  inference_config:
+    liveness_route:
+      path: /health
+      port: 8080
+    readiness_route:
+      path: /health
+      port: 8080
+    scoring_route:
+      path: /score
+      port: 8080
+instance_type: Standard_E4s_v3
+instance_count: 1
+environment_variables:
+  PRT_CONFIG_OVERRIDE: deployment.subscription_id=fdf0235b-0756-409c-bc69-23d183fbff17,deployment.resource_group=rg-smart-agents-dev,deployment.workspace_name=project-support-agent,deployment.endpoint_name=triage-endpoint,deployment.deployment_name=blue
+  PROMPTFLOW_RESPONSE_INCLUDED_FIELDS: '["result"]'
+  # Override the azure_openai_connection to use env-based authentication
+  AZURE_OPENAI_CONNECTION_API_BASE: https://oai-agents-dw7z4hg4ssn2k.openai.azure.com/
+  AZURE_OPENAI_CONNECTION_API_VERSION: 2024-08-01-preview
+  AZURE_OPENAI_CONNECTION_API_KEY: af37db03ed504dc3b9a41ab27961670f
+request_settings:
+  request_timeout_ms: 30000

@@ -212,7 +212,7 @@ demos/
 │   └── rag-function/
 │       └── function_app.py    # ✅ Enhanced confidence calculation
 ├── 03-agent-with-tools/       # Function calling demo (✅ deployed)
-└── 04b-real-ticket-creation/  # ✅ PRODUCTION - Event-driven email processing
+└── 04-real-ticket-creation/  # ✅ PRODUCTION - Event-driven email processing
     └── function/
         ├── src/
         │   ├── functions/
@@ -242,7 +242,7 @@ infra/
 
 ## Key Files to Reference
 
-- **Working Function Code:** `demos/04b-real-ticket-creation/function/src/`
+- **Working Function Code:** `demos/04-real-ticket-creation/function/src/`
 - **Infrastructure:** `infra/*.bicep`
 - **Sample KB data:** `demos/02-rag-search/content/*.md`
 - **Test Scripts:** `tests/*.ps1`
@@ -257,7 +257,7 @@ az login && az account set -s <subscription-id>
 npm install -g typescript azure-functions-core-tools@4
 
 # Build function
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 npm install
 npm run build
 

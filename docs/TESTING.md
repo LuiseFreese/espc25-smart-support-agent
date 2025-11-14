@@ -289,7 +289,7 @@ az deployment sub create --location eastus --template-file infra/main.bicep --pa
 
 **Solution**:
 ```powershell
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 
 # Clean and reinstall
 Remove-Item -Recurse -Force node_modules, dist
@@ -346,7 +346,7 @@ az functionapp restart --name func-agents-dw7z4hg4ssn2k --resource-group rg-smar
 
 **Solution**:
 
-Update keyword patterns in `demos/04b-real-ticket-creation/function/src/services/AIService.ts`:
+Update keyword patterns in `demos/04-real-ticket-creation/function/src/services/AIService.ts`:
 
 ```typescript
 private keywordBasedTriage(emailBody: string): TriageResult {
@@ -365,7 +365,7 @@ private keywordBasedTriage(emailBody: string): TriageResult {
 
 Then rebuild and redeploy:
 ```powershell
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 npm run build
 func azure functionapp publish func-agents-dw7z4hg4ssn2k
 ```
@@ -492,7 +492,7 @@ jobs:
       
       - name: Build Functions
         run: |
-          cd demos/04b-real-ticket-creation/function
+          cd demos/04-real-ticket-creation/function
           npm install
           npm run build
       

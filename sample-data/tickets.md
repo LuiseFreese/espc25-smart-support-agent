@@ -46,11 +46,11 @@ I was charged twice for order #45678. My card ending in 1234 shows two transacti
 
 ---
 
-## Ticket 4: Cannot Access SharePoint Site
+## Ticket 4: Cannot Access Finance Portal
 
 **Text:**
 ```
-When I try to open https://contoso.sharepoint.com/sites/finance, I get "Access Denied - You need permission to access this site." I was able to access it last week without issues.
+When I try to open the finance portal, I get "Access Denied - You need permission to access this site." I was able to access it last week without issues.
 ```
 
 **Expected:**
@@ -246,7 +246,7 @@ I keep getting "Email delivery failed" errors when sending to external addresses
 
 **Text:**
 ```
-I'm a new employee starting Monday. I need access to: email, SharePoint, CRM, and expense system. My manager is Jane Doe.
+I'm a new employee starting Monday. I need access to: email, CRM, and expense system. My manager is Jane Doe.
 ```
 
 **Expected:**
@@ -305,7 +305,7 @@ Convert tickets into questions and test against KB:
 
 - Ticket 1 → "How do I reset my password?"
 - Ticket 2 → "How to fix VPN disconnects?"
-- Ticket 4 → "How to request SharePoint access?"
+- Ticket 4 → "How to request access to systems?"
 
 **Success criteria:**
 - Answer found in KB: cite source with [1]

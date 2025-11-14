@@ -288,7 +288,7 @@ az functionapp config appsettings set `
 
 ```powershell
 # Navigate to function directory
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 
 # Install dependencies
 npm install

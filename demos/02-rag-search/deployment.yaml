@@ -1,0 +1,30 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineDeployment.schema.json
+name: blue
+endpoint_name: rag-support-endpoint
+model:
+  path: .
+  properties:
+    azureml.promptflow.source_flow_id: rag-support-flow
+environment:
+  image: mcr.microsoft.com/azureml/promptflow/promptflow-runtime:latest
+  inference_config:
+    liveness_route:
+      path: /health
+      port: 8080
+    readiness_route:
+      path: /health
+      port: 8080
+    scoring_route:
+      path: /score
+      port: 8080
+instance_type: Standard_E4s_v3
+instance_count: 1
+environment_variables:
+  PROMPTFLOW_RESPONSE_INCLUDED_FIELDS: '["answer", "citations"]'
+  AZURE_OPENAI_ENDPOINT: https://oai-agents-dw7z4hg4ssn2k.openai.azure.com/
+  AZURE_OPENAI_API_VERSION: 2024-08-01-preview
+  AZURE_OPENAI_DEPLOYMENT: gpt-4o-mini
+  AZURE_AI_SEARCH_ENDPOINT: https://srch-agents-dw7z4hg4ssn2k.search.windows.net
+  AZURE_AI_SEARCH_INDEX: kb-support
+request_settings:
+  request_timeout_ms: 30000

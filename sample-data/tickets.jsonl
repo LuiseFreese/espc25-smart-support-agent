@@ -1,7 +1,7 @@
 {"inputs":{"ticket_text":"I've tried resetting my password three times using the self-service portal, but I never receive the email. I checked spam and it's not there either. My email is user123@example.com. I need access urgently for a client presentation this afternoon."},"outputs":{"category":"Account","priority":"High"}}
 {"inputs":{"ticket_text":"The VPN connection drops every 5-10 minutes. I've restarted my laptop and tried different Wi-Fi networks but the issue persists. This is making it impossible to work remotely."},"outputs":{"category":"Technical","priority":"Medium"}}
 {"inputs":{"ticket_text":"I was charged twice for order #45678. My card ending in 1234 shows two transactions of $99.99 on Nov 8. Please refund the duplicate charge immediately."},"outputs":{"category":"Billing","priority":"High"}}
-{"inputs":{"ticket_text":"When I try to open https://contoso.sharepoint.com/sites/finance, I get Access Denied - You need permission to access this site. I was able to access it last week without issues."},"outputs":{"category":"Access","priority":"High"}}
+{"inputs":{"ticket_text":"When I try to access the finance portal, I get Access Denied - You need permission to access this site. I was able to access it last week without issues."},"outputs":{"category":"Access","priority":"High"}}
 {"inputs":{"ticket_text":"I need to upgrade from the Basic plan to Premium. What's the pricing and how long does it take to activate?"},"outputs":{"category":"Billing","priority":"Medium"}}
 {"inputs":{"ticket_text":"I received a suspicious email claiming to be from IT asking me to verify my credentials. The link is http://fakephishing.com/verify. I did NOT click it. Is this a known phishing attempt?"},"outputs":{"category":"Technical","priority":"High"}}
 {"inputs":{"ticket_text":"How do I set up MFA for my account? I got an email saying it's required starting next week but I don't see where to configure it."},"outputs":{"category":"Account","priority":"Medium"}}
@@ -15,6 +15,6 @@
 {"inputs":{"ticket_text":"My expense report from Oct 15 is still pending approval. It's been 3 weeks. Who do I contact to escalate this?"},"outputs":{"category":"Technical","priority":"Medium"}}
 {"inputs":{"ticket_text":"The company mobile app crashes immediately after I log in on my iPhone 15. I've tried uninstalling and reinstalling but it still crashes."},"outputs":{"category":"Technical","priority":"Medium"}}
 {"inputs":{"ticket_text":"I keep getting Email delivery failed errors when sending to external addresses. Emails to internal users work fine. Error code: 550 5.7.1."},"outputs":{"category":"Technical","priority":"High"}}
-{"inputs":{"ticket_text":"I'm a new employee starting Monday. I need access to: email, SharePoint, CRM, and expense system. My manager is Jane Doe."},"outputs":{"category":"Access","priority":"High"}}
+{"inputs":{"ticket_text":"I'm a new employee starting Monday. I need access to: email, CRM, and expense system. My manager is Jane Doe."},"outputs":{"category":"Access","priority":"High"}}
 {"inputs":{"ticket_text":"Just wanted to say the new support portal is great! Much easier to find answers than the old system."},"outputs":{"category":"Technical","priority":"Low"}}
 {"inputs":{"ticket_text":"The thing isn't working. Please fix it."},"outputs":{"category":"Technical","priority":"Medium"}}

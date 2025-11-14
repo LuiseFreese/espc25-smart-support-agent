@@ -1,0 +1,417 @@
+{
+  "flow_runs": [
+    {
+      "run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb_0",
+      "status": "Completed",
+      "error": null,
+      "inputs": {
+        "ticket_text": "VPN disconnects every 5 minutes"
+      },
+      "output": {
+        "result": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}"
+      },
+      "metrics": null,
+      "request": null,
+      "parent_run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb",
+      "root_run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb",
+      "source_run_id": null,
+      "flow_id": "default_flow_id",
+      "start_time": "2025-11-10T12:34:45.488121Z",
+      "end_time": "2025-11-10T12:34:46.299562Z",
+      "index": 0,
+      "api_calls": [
+        {
+          "name": "flow",
+          "node_name": "flow",
+          "type": "Flow",
+          "start_time": 1762774485.488121,
+          "end_time": 1762774486.299562,
+          "children": [
+            {
+              "name": "AzureOpenAI.chat",
+              "type": "Function",
+              "inputs": {
+                "prompt": "system:\n{{system_prompt}}\n\nuser:\nClassify this support ticket:\n\nTicket:\n{{ ticket_text }}\n\nRespond with JSON only containing \"category\" and \"priority\" fields.\n",
+                "deployment_name": "gpt-4o-mini",
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "max_tokens": 200,
+                "response_format": {
+                  "type": "json_object"
+                },
+                "ticket_text": "VPN disconnects every 5 minutes",
+                "_inputs_to_escape": [
+                  "ticket_text"
+                ],
+                "stream": false
+              },
+              "output": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+              "start_time": 1762774485.492654,
+              "end_time": 1762774486.294046,
+              "error": null,
+              "children": [
+                {
+                  "name": "openai_chat",
+                  "type": "LLM",
+                  "inputs": {
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                      {
+                        "role": "system",
+                        "content": ""
+                      },
+                      {
+                        "role": "user",
+                        "content": "Classify this support ticket:\n\nTicket:\nVPN disconnects every 5 minutes\n\nRespond with JSON only containing \"category\" and \"priority\" fields."
+                      }
+                    ],
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "n": 1,
+                    "stream": false,
+                    "presence_penalty": 0.0,
+                    "frequency_penalty": 0.0,
+                    "user": "",
+                    "max_tokens": 200,
+                    "response_format": {
+                      "type": "json_object"
+                    }
+                  },
+                  "output": {
+                    "id": "chatcmpl-CaLOXuqBrTLQhxilNYhtbepkFNALj",
+                    "choices": [
+                      {
+                        "finish_reason": "stop",
+                        "index": 0,
+                        "logprobs": null,
+                        "message": {
+                          "content": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+                          "refusal": null,
+                          "role": "assistant",
+                          "annotations": [],
+                          "audio": null,
+                          "function_call": null,
+                          "tool_calls": null
+                        },
+                        "content_filter_results": {
+                          "hate": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "self_harm": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "sexual": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "violence": {
+                            "filtered": false,
+                            "severity": "safe"
+                          }
+                        }
+                      }
+                    ],
+                    "created": 1762778085,
+                    "model": "gpt-4o-mini-2024-07-18",
+                    "object": "chat.completion",
+                    "service_tier": null,
+                    "system_fingerprint": "fp_efad92c60b",
+                    "usage": {
+                      "completion_tokens": 18,
+                      "prompt_tokens": 41,
+                      "total_tokens": 59,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": 0,
+                        "audio_tokens": 0,
+                        "reasoning_tokens": 0,
+                        "rejected_prediction_tokens": 0
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": 0,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "prompt_filter_results": [
+                      {
+                        "prompt_index": 0,
+                        "content_filter_results": {
+                          "hate": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "self_harm": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "sexual": {
+                            "filtered": false,
+                            "severity": "safe"
+                          },
+                          "violence": {
+                            "filtered": false,
+                            "severity": "safe"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "start_time": 1762774485.496651,
+                  "end_time": 1762774486.293043,
+                  "error": null,
+                  "children": [],
+                  "node_name": null,
+                  "parent_id": "1c99f9f7-d5ef-48e4-b650-bdb4a6ad89f3",
+                  "id": "1c8cde93-9347-4c1f-b631-5161dd46e2ff",
+                  "function": "openai.resources.chat.completions.completions.Completions.create",
+                  "system_metrics": {
+                    "completion_tokens": 18,
+                    "prompt_tokens": 41,
+                    "total_tokens": 59
+                  }
+                }
+              ],
+              "node_name": "classify",
+              "parent_id": "",
+              "id": "1c99f9f7-d5ef-48e4-b650-bdb4a6ad89f3",
+              "function": "AzureOpenAI.chat",
+              "system_metrics": {
+                "completion_tokens": 18,
+                "prompt_tokens": 41,
+                "total_tokens": 59
+              }
+            }
+          ],
+          "system_metrics": {
+            "duration": 0.811441,
+            "prompt_tokens": 41,
+            "completion_tokens": 18,
+            "total_tokens": 59
+          },
+          "inputs": {
+            "ticket_text": "VPN disconnects every 5 minutes"
+          },
+          "output": {
+            "result": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}"
+          },
+          "error": null
+        }
+      ],
+      "name": "",
+      "description": "",
+      "tags": null,
+      "system_metrics": {
+        "duration": 0.811441,
+        "prompt_tokens": 41,
+        "completion_tokens": 18,
+        "total_tokens": 59
+      },
+      "result": {
+        "result": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}"
+      },
+      "upload_metrics": false,
+      "otel_trace_id": "0x3bc4a237fb7f83ab8f1042d1780676f1",
+      "message_format": "basic"
+    }
+  ],
+  "node_runs": [
+    {
+      "node": "classify",
+      "flow_run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb",
+      "run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb_classify_0",
+      "status": "Completed",
+      "inputs": {
+        "deployment_name": "gpt-4o-mini",
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 200,
+        "response_format": {
+          "type": "json_object"
+        },
+        "ticket_text": "VPN disconnects every 5 minutes",
+        "_inputs_to_escape": [
+          "ticket_text"
+        ]
+      },
+      "output": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+      "metrics": null,
+      "error": null,
+      "parent_run_id": "7b07d34e-bf11-4cfa-ba9b-9aeb5f88d3cb_0",
+      "start_time": "2025-11-10T12:34:45.491642Z",
+      "end_time": "2025-11-10T12:34:46.297046Z",
+      "index": 0,
+      "api_calls": [
+        {
+          "name": "AzureOpenAI.chat",
+          "type": "Function",
+          "inputs": {
+            "prompt": "system:\n{{system_prompt}}\n\nuser:\nClassify this support ticket:\n\nTicket:\n{{ ticket_text }}\n\nRespond with JSON only containing \"category\" and \"priority\" fields.\n",
+            "deployment_name": "gpt-4o-mini",
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "max_tokens": 200,
+            "response_format": {
+              "type": "json_object"
+            },
+            "ticket_text": "VPN disconnects every 5 minutes",
+            "_inputs_to_escape": [
+              "ticket_text"
+            ],
+            "stream": false
+          },
+          "output": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+          "start_time": 1762774485.492654,
+          "end_time": 1762774486.294046,
+          "error": null,
+          "children": [
+            {
+              "name": "openai_chat",
+              "type": "LLM",
+              "inputs": {
+                "model": "gpt-4o-mini",
+                "messages": [
+                  {
+                    "role": "system",
+                    "content": ""
+                  },
+                  {
+                    "role": "user",
+                    "content": "Classify this support ticket:\n\nTicket:\nVPN disconnects every 5 minutes\n\nRespond with JSON only containing \"category\" and \"priority\" fields."
+                  }
+                ],
+                "temperature": 0.0,
+                "top_p": 1.0,
+                "n": 1,
+                "stream": false,
+                "presence_penalty": 0.0,
+                "frequency_penalty": 0.0,
+                "user": "",
+                "max_tokens": 200,
+                "response_format": {
+                  "type": "json_object"
+                }
+              },
+              "output": {
+                "id": "chatcmpl-CaLOXuqBrTLQhxilNYhtbepkFNALj",
+                "choices": [
+                  {
+                    "finish_reason": "stop",
+                    "index": 0,
+                    "logprobs": null,
+                    "message": {
+                      "content": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+                      "refusal": null,
+                      "role": "assistant",
+                      "annotations": [],
+                      "audio": null,
+                      "function_call": null,
+                      "tool_calls": null
+                    },
+                    "content_filter_results": {
+                      "hate": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "self_harm": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "sexual": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "violence": {
+                        "filtered": false,
+                        "severity": "safe"
+                      }
+                    }
+                  }
+                ],
+                "created": 1762778085,
+                "model": "gpt-4o-mini-2024-07-18",
+                "object": "chat.completion",
+                "service_tier": null,
+                "system_fingerprint": "fp_efad92c60b",
+                "usage": {
+                  "completion_tokens": 18,
+                  "prompt_tokens": 41,
+                  "total_tokens": 59,
+                  "completion_tokens_details": {
+                    "accepted_prediction_tokens": 0,
+                    "audio_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "rejected_prediction_tokens": 0
+                  },
+                  "prompt_tokens_details": {
+                    "audio_tokens": 0,
+                    "cached_tokens": 0
+                  }
+                },
+                "prompt_filter_results": [
+                  {
+                    "prompt_index": 0,
+                    "content_filter_results": {
+                      "hate": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "self_harm": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "sexual": {
+                        "filtered": false,
+                        "severity": "safe"
+                      },
+                      "violence": {
+                        "filtered": false,
+                        "severity": "safe"
+                      }
+                    }
+                  }
+                ]
+              },
+              "start_time": 1762774485.496651,
+              "end_time": 1762774486.293043,
+              "error": null,
+              "children": [],
+              "node_name": null,
+              "parent_id": "1c99f9f7-d5ef-48e4-b650-bdb4a6ad89f3",
+              "id": "1c8cde93-9347-4c1f-b631-5161dd46e2ff",
+              "function": "openai.resources.chat.completions.completions.Completions.create",
+              "system_metrics": {
+                "completion_tokens": 18,
+                "prompt_tokens": 41,
+                "total_tokens": 59
+              }
+            }
+          ],
+          "node_name": "classify",
+          "parent_id": "",
+          "id": "1c99f9f7-d5ef-48e4-b650-bdb4a6ad89f3",
+          "function": "AzureOpenAI.chat",
+          "system_metrics": {
+            "completion_tokens": 18,
+            "prompt_tokens": 41,
+            "total_tokens": 59
+          }
+        }
+      ],
+      "cached_run_id": null,
+      "cached_flow_run_id": null,
+      "logs": {
+        "stdout": "",
+        "stderr": ""
+      },
+      "system_metrics": {
+        "completion_tokens": 18,
+        "prompt_tokens": 41,
+        "total_tokens": 59,
+        "duration": 0.805404
+      },
+      "result": "{\n  \"category\": \"Network Issue\",\n  \"priority\": \"High\"\n}",
+      "message_format": "basic"
+    }
+  ]
+}

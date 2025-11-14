@@ -1,0 +1,17 @@
+# Python dependencies for Azure AI Foundry Smart Support Agent
+# Install: pip install -r requirements.txt
+
+# Azure SDK
+azure-search-documents>=11.4.0
+azure-identity>=1.15.0
+azure-core>=1.29.0
+
+# OpenAI
+openai>=1.12.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Prompt flow (for demos)
+promptflow>=1.8.0
+promptflow-tools>=1.2.0

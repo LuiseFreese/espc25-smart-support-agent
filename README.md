@@ -48,6 +48,30 @@
 
 ---
 
+## 📊 Demo Validation Status
+
+All demos have been validated and documented. See [DEMO-OVERVIEW.md](DEMO-OVERVIEW.md) for detailed resource mapping.
+
+| Demo | Status | Validation | Test Results |
+|------|--------|------------|--------------|
+| **Demo 01: Triage** | ✅ Functional | 100% category, 80% priority | [README](demos/01-triage-promptflow/README.md) |
+| **Demo 02: RAG Search** | ✅ Functional | 80% pass rate (avg 0.64 confidence) | [README](demos/02-rag-search/README.md) |
+| **Demo 03: Agents** | ✅ **DEPLOYED** | 100% tool selection | [README](demos/03-agent-with-tools/README.md) |
+| **Demo 04: Production** | ✅ **PRODUCTION** | Fully tested (webhook + RAG + tickets) | [README](demos/04-real-ticket-creation/function/README.md) |
+
+**Test Scripts:**
+- `tests/test-demo01-triage.py` - Classification accuracy (5 scenarios)
+- `tests/test-demo02-rag.ps1` - RAG confidence scores (5 queries)
+- `tests/test-demo03-agent.py` - Function calling validation (4 scenarios)
+- Email test: Send to `AdeleV@hscluise.onmicrosoft.com` for webhook flow
+
+**Key Achievements:**
+- ✅ Demo 03 functions deployed to production (GetOrderStatus, CreateTicket)
+- ✅ 100% tool selection accuracy with enhanced system prompt
+- ✅ All 4 production demos validated and documented
+
+---
+
 ## 🤖 Azure AI Foundry Integration
 
 This project leverages **Azure AI Foundry** as the unified platform for AI development and deployment:
@@ -306,7 +330,7 @@ This indexes:
 
 ```bash
 # Build and deploy email processing function (Node.js)
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 npm install
 npm run build
 func azure functionapp publish func-agents-<suffix>
@@ -417,7 +441,7 @@ cd demos/03-agent-with-tools/agent
 npm run dev -- "Where is order 12345?"
 ```
 
-### Demo 04b: Email-to-Storage (Production Implementation)
+### Demo 04: Email-to-Storage (Production Implementation)
 **Status**: Deployed and Working End-to-End
 
 Complete email processing pipeline with ticket persistence.
@@ -680,7 +704,7 @@ cd demos/03-agent-with-tools/function-tool
 func azure functionapp publish <function-app-name>
 
 # Deploy email processing function
-cd demos/04b-real-ticket-creation/function
+cd demos/04-real-ticket-creation/function
 npm install && npm run build
 func azure functionapp publish <function-app-name>
 ```

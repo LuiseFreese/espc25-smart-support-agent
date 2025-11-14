@@ -319,3 +319,92 @@ pf flow test -f flow.dag.yaml --inputs data/rag_eval.jsonl
 # Calculate metrics
 # (Implement custom evaluators for precision, recall, F1)
 ```
+
+## Validation Results
+
+**Test Date**: November 14, 2025
+
+### ✅ RAG Function Deployment
+
+**Function**: `func-rag-dw7z4hg4ssn2k` (Sweden Central)
+- **Endpoint**: `https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search`
+- **Runtime**: Python 3.11
+- **Authentication**: Function key required (`x-functions-key` header)
+
+### ✅ Test Results
+
+Tested with 5 different support scenarios:
+
+| Query | Confidence | Answer Length | Status |
+|-------|------------|---------------|---------|
+| How do I reset my password? | 0.80 | 509 chars | ✅ High |
+| VPN keeps disconnecting | 0.60 | 1243 chars | ✅ Pass |
+| I was charged twice on my bill | 0.40 | 269 chars | ⚠️ Low |
+| Can't install Office 365 | 0.60 | 843 chars | ✅ Pass |
+| How do I configure MFA? | 0.80 | 317 chars | ✅ High |
+
+**Summary**:
+- **Total Tests**: 5
+- **Passed (Confidence ≥0.6)**: 4 (80%)
+- **Failed**: 1 (20%)
+- **Average Confidence**: 0.64
+
+### 🔍 Observations
+
+**What's Working**:
+- ✅ Score-based confidence calculation (0.1-0.9 range based on semantic ranking)
+- ✅ High-quality responses for password reset, VPN, software installation, MFA
+- ✅ Detailed answers with step-by-step instructions
+- ✅ Fast response times (<2 seconds per query)
+
+**Known Limitations**:
+- ⚠️ Billing queries get lower confidence (0.4) - may need more billing documentation in KB
+- ⚠️ Knowledge base limited to 10 documents
+- ⚠️ Confidence threshold for auto-reply set at 0.7 (may need tuning based on more data)
+
+### 📝 Test Command
+
+```powershell
+# Set environment variable
+$env:RAG_KEY = "YOUR_RAG_FUNCTION_KEY_HERE"
+
+# Run test
+.\tests\test-demo02-rag.ps1
+```
+
+**Get Function Key**:
+```powershell
+az functionapp keys list --name func-rag-dw7z4hg4ssn2k --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+```
+
+### ✅ Production Status
+
+**Current State**: Demo 02 is **FULLY FUNCTIONAL**.
+
+**Verified Components**:
+- ✅ Azure AI Search index (`kb-support`) with 10 embedded documents
+- ✅ RAG function deployed and responding
+- ✅ Text embedding model (`text-embedding-3-large`) working
+- ✅ Chat model (`gpt-4o-mini`) generating answers
+- ✅ Semantic ranking returning relevant results
+
+**Integration**:
+- Used by Demo 04b for knowledge base search
+- Called via `POST /api/rag-search` with `{"question": "..."}` body
+- Returns `{"answer": "...", "confidence": 0.0-1.0, "sources": [...]}`
+
+### 🔄 Next Steps
+
+To improve RAG performance:
+
+1. **Expand Knowledge Base** - Add more documents covering:
+   - Detailed billing procedures
+   - Software installation guides
+   - Security/compliance topics
+   - Common troubleshooting scenarios
+
+2. **Tune Confidence Threshold** - Collect more data to optimize the 0.7 threshold
+
+3. **Add Evaluation Pipeline** - Implement automated quality metrics (relevance, groundedness)
+
+4. **Enable Prompt Flow** - Deploy the `flow.dag.yaml` for more sophisticated answer generation

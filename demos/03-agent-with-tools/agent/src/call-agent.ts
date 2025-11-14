@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 const OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT!;
 const OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
 const OPENAI_API_VERSION = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview';
-const FUNCTION_BASE_URL = process.env.AZURE_FUNCTION_APP_URL || 'http://localhost:7071/api';
+const FUNCTION_BASE_URL = process.env.AZURE_FUNCTION_APP_URL || 'https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api';
 
 // Debug: Check if endpoint is loaded
 if (!OPENAI_ENDPOINT) {
@@ -164,11 +164,14 @@ export async function runAgent(userMessage: string): Promise<string> {
   const messages: Message[] = [
     {
       role: 'system',
-      content: `You are a helpful support agent. You can call tools to:
-1. Get order status and tracking information using getOrderStatus
-2. Create support tickets using createTicket
+      content: `You are a helpful customer service agent. Use the available tools to help customers.
 
-Use tools only when necessary. Do not invent data. Summarize tool results clearly and include relevant IDs.
+IMPORTANT: When a customer mentions ANY problem, issue, or asks for help with something,
+you MUST create a support ticket using the createTicket tool. Always create a ticket
+for customer problems.
+
+For order status inquiries, use the getOrderStatus tool.
+
 Be concise and professional in your responses.`,
     },
     {
