@@ -356,6 +356,26 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
 AZURE_FUNCTION_APP_URL=http://localhost:7071/api
 ```
 
+**Authentication Strategy:**
+
+The agent supports two authentication modes:
+
+1. **Local Development (API Key)**: Default when `AZURE_OPENAI_API_KEY` is present
+   - Fast setup, no Azure CLI login required
+   - Best for testing and demos
+
+2. **Production (Managed Identity)**: Enable by setting `USE_MANAGED_IDENTITY=true`
+   - No API keys stored in environment
+   - Requires Azure CLI login (`az login`) or Managed Identity role assignment
+   - Recommended for deployed applications
+
+**Behavior:**
+- If `USE_MANAGED_IDENTITY=true` → Uses Managed Identity (even if API key present)
+- If `AZURE_OPENAI_API_KEY` present → Uses API key
+- Otherwise → Falls back to Managed Identity
+
+This prevents authentication conflicts when redeploying or switching environments.
+
 ### Run Agent
 
 **IMPORTANT**: Azure Functions must be running (see Part 1) before starting the agent!
