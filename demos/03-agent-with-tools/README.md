@@ -388,7 +388,7 @@ npm run dev -- "Check order 67890 and if it's not delivered, create a ticket"
   items: [ 'Laptop Stand', 'Wireless Mouse' ]
 }
 
-✅ Assistant: Your order 12345 is currently in transit. The expected delivery date is November 15, 2025. The tracking number is TRK-98765-ABCD. Your order includes a Laptop Stand and a Wireless Mouse.
+Assistant: Your order 12345 is currently in transit. The expected delivery date is November 15, 2025. The tracking number is TRK-98765-ABCD. Your order includes a Laptop Stand and a Wireless Mouse.
 ```
 
 ### How It Works (Under the Hood)
@@ -517,7 +517,7 @@ customEvents
 
 **Test Date**: November 14, 2025
 
-### ✅ Function Calling Testing
+### Function Calling Testing
 
 Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini` and mock tool implementations.
 
@@ -528,7 +528,7 @@ Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini
 | Where is my order 12345? | getOrderStatus | orderId: 12345 | ✅ Perfect |
 | What's the status of order 67890? | getOrderStatus | orderId: 67890 | ✅ Perfect |
 | I need help with my printer (customer CUST123) | createTicket | customerId: CUST123 | ✅ Perfect |
-| Create a ticket for network issues (ABC456) | createTicket | customerId: ABC456 | ✅ Perfect |
+| Create a ticket for network issues (ABC456) | createTicket | customerId: ABC456 | Perfect |
 
 **Accuracy Metrics**:
 - **Correct Tool Selection**: 100% (4/4)
@@ -536,27 +536,27 @@ Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini
 - **Fully Correct**: 100% (4/4)
 
 **Notes**:
-- ✅ Order status queries: 100% success (both tests correctly identified order IDs)
-- ✅ Explicit ticket creation: 100% success (when customer explicitly asks to create ticket)
-- ✅ Implicit help requests: 100% success (model correctly identifies problems and creates tickets)
+- Order status queries: 100% success (both tests correctly identified order IDs)
+- Explicit ticket creation: 100% success (when customer explicitly asks to create ticket)
+- Implicit help requests: 100% success (model correctly identifies problems and creates tickets)
   - **Key Fix**: Enhanced system prompt with explicit instruction to create tickets for any customer problem
-- ✅ Final answer synthesis: Natural language responses generated correctly
-- ✅ Multi-step reasoning: Model → Tool → Model workflow working perfectly
+- Final answer synthesis: Natural language responses generated correctly
+- Multi-step reasoning: Model → Tool → Model workflow working perfectly
 
 ### 🔍 Observations
 
 **What's Working**:
-- ✅ Function calling mechanism (model correctly formats tool calls)
-- ✅ Parameter extraction from natural language (order IDs, customer IDs)
-- ✅ Multi-turn conversation (assistant + tool + assistant flow)
-- ✅ JSON schema validation (all tool calls matched expected format)
+- Function calling mechanism (model correctly formats tool calls)
+- Parameter extraction from natural language (order IDs, customer IDs)
+- Multi-turn conversation (assistant + tool + assistant flow)
+- JSON schema validation (all tool calls matched expected format)
 **What's Working**:
-- ✅ Function calling mechanism (model correctly formats tool calls)
-- ✅ Parameter extraction from natural language (order IDs, customer IDs)
-- ✅ Multi-turn conversation (assistant + tool + assistant flow)
-- ✅ JSON schema validation (all tool calls matched expected format)
-- ✅ Response synthesis (final answers are helpful and natural)
-- ✅ Implicit problem detection (enhanced system prompt achieves 100% accuracy)
+- Function calling mechanism (model correctly formats tool calls)
+- Parameter extraction from natural language (order IDs, customer IDs)
+- Multi-turn conversation (assistant + tool + assistant flow)
+- JSON schema validation (all tool calls matched expected format)
+- Response synthesis (final answers are helpful and natural)
+- Implicit problem detection (enhanced system prompt achieves 100% accuracy)
 
 **System Prompt Best Practice**:
 
@@ -585,21 +585,21 @@ python tests/test-demo03-agent.py
 # npm install && npm run dev -- 'Where is order 12345?'
 ```
 
-### ✅ Production Status
+### Production Status
 
-**Current State**: ✅ **DEPLOYED AND FULLY OPERATIONAL** - 100% functional in production
+**Current State**: **DEPLOYED AND FULLY OPERATIONAL** - 100% functional in production
 
 **Deployment Date**: November 14, 2025
 
 **Verified Components**:
-- ✅ Azure OpenAI function calling (`gpt-4o-mini`) - 100% accuracy
-- ✅ Tool schema definitions (JSON schema format)
-- ✅ Parameter extraction from queries - 100% accuracy
-- ✅ Multi-step agent workflow
-- ✅ Response synthesis
-- ✅ Enhanced system prompt for implicit problem detection
-- ✅ **GetOrderStatus function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/getorderstatus`
-- ✅ **CreateTicket function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/createticket`
+- Azure OpenAI function calling (`gpt-4o-mini`) - 100% accuracy
+- Tool schema definitions (JSON schema format)
+- Parameter extraction from queries - 100% accuracy
+- Multi-step agent workflow
+- Response synthesis
+- Enhanced system prompt for implicit problem detection
+- **GetOrderStatus function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/getorderstatus`
+- **CreateTicket function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/createticket`
 
 **Production Test Results**:
 ```bash
