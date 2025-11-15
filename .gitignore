@@ -28,6 +28,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .Python
+.python_packages/
+.pytest_cache/
 env/
 venv/
 .venv
@@ -65,3 +67,17 @@ htmlcov/
 # Build outputs
 build/
 out/
+
+# Temporary files
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Session planning (internal)
+SESSION-STORYLINE.md
+PRESENTATION-GUIDE.md
+.github/copilot-instructions.md
+
+demos/03-agent-with-tools/agent/post-restart/deployments/
+demos/03-agent-with-tools/agent/post-restart/LogFiles/

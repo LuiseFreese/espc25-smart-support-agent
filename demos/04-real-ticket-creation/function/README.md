@@ -1,49 +1,51 @@
-# Demo 04: Real-Time Email Support Ticket Creation
+# Demo 04: Production Email Support System
 
-**Production event-driven system** using Microsoft Graph webhooks, Azure Functions, and Azure Table Storage for automated support ticket processing.
+This demo integrates all previous demos into a complete, event-driven email processing system that automatically creates support tickets and responds to customers.
 
-## Quick Start
+## What This Demo Shows
 
-**Deploy to Azure:**
+- **Event-driven architecture** with Microsoft Graph webhooks
+- **Complete AI pipeline:** Triage (Demo 01) → RAG (Demo 02) → Tool calling pattern (Demo 03)
+- **Persistent storage** for ticket tracking
+- **Intelligent routing:** Auto-reply vs escalation based on confidence
+- **Production-ready patterns:** Deduplication, error handling, observability
 
-1. Ensure you're in the correct Azure tenant:
-   ```powershell
-   az login --tenant b469e370-d6a6-45b5-928e-856ae0307a6d
-   ```
+## System Architecture
 
-2. Build and deploy the function:
-   ```powershell
-   cd demos/04-real-ticket-creation/function
-   npm install
-   npm run build
-   func azure functionapp publish func-agents-dw7z4hg4ssn2k
-   ```
-
-3. Verify deployment:
-   ```powershell
-   Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/pingstorage"
-   ```
-
-## Architecture
-
-```
-New Email Arrives
-        ↓
-Microsoft Graph Webhook (instant notification)
-        ↓
-GraphWebhook Function (validates & deduplicates)
-        ↓
-Keyword-Based Triage (Category + Priority)
-        ↓
-RAG Search Function (Python - semantic ranking)
-        ↓
-Calculate Confidence (0.1-0.9 based on reranker scores)
-        ↓
-Create Ticket in Table Storage
-        ↓
-High Confidence (≥0.7)?
-  ├─ Yes → Auto-reply to customer
-  └─ No → Forward to support team
+```mermaid
+flowchart TD
+    A[Email Arrives] -->|Instant webhook notification| B[GraphWebhook Function<br/>Node.js]
+    
+    B --> B1{Validate Request}
+    B1 --> B2{Self-email?}
+    B2 -->|No| B3{Duplicate?}
+    B3 -->|New| C[Triage:<br/>Keyword Classification]
+    
+    C --> C1["Category<br/>(Network/Access/Billing)"]
+    C --> C2["Priority<br/>(High/Medium/Low)"]
+    
+    C1 & C2 --> D[RAG Search Function<br/>Python]
+    
+    D --> D1[Azure AI Search<br/>Semantic Search]
+    D1 --> D2["AI Answer +<br/>Confidence (0.1-0.9)"]
+    
+    D2 --> E[Create Ticket<br/>Table Storage]
+    E --> E1["TKT-YYYYMMDD-XXXXXX<br/>+ Metadata"]
+    
+    E1 --> F{Confidence ≥ 0.7?}
+    F -->|Yes| G[Auto-Reply<br/>to Customer]
+    F -->|No| H[Escalate<br/>to Human]
+    
+    G & H --> I[Log to<br/>App Insights]
+    
+    B2 -->|Yes| Skip[Skip Processing]
+    B3 -->|Duplicate| Skip
+    
+    style A fill:#0078d4,color:#fff
+    style F fill:#ffb900,color:#000
+    style G fill:#107c10,color:#fff
+    style H fill:#d13438,color:#fff
+    style Skip fill:#666,color:#fff
 ```
 
 ## Production Components
@@ -51,355 +53,222 @@ High Confidence (≥0.7)?
 ### 1. GraphWebhook Function
 - **Trigger**: HTTP POST from Microsoft Graph
 - **Auth Level**: Anonymous (required for Graph validation)
-- **Purpose**: Real-time email processing when new email arrives
-- **Features**:
-  - Validates webhook requests (clientState check)
-  - Prevents infinite loops (skips self-emails)
-  - Deduplicates using EmailMessageId in Table Storage
 
-### 2. ManageSubscription Function  
-- **Trigger**: HTTP GET/POST
-- **Auth Level**: Function key required
-- **Purpose**: Create/renew/list Microsoft Graph webhook subscriptions
-- **Note**: Subscriptions expire after 3 days, must be renewed
+## Azure Resources Used
 
-### 3. ProcessSupportEmail Function
-- **Trigger**: HTTP GET/POST
-- **Auth Level**: Function key required
-- **Purpose**: Manual processing of unread emails (bypasses webhook)
-- **Use Case**: Batch processing or webhook troubleshooting
+### Azure Functions - Email Processing (\unc-agents-*\)
 
-### 4. PingStorage Function
-- **Trigger**: HTTP GET
-- **Auth Level**: Anonymous
-- **Purpose**: Health check - verifies Table Storage connectivity
+**Purpose:** Serverless compute for email orchestration and business logic
 
-### 5. CheckMailboxTimer Function
-- **Status**: DISABLED (caused infinite loops)
-- **Replaced By**: Event-driven GraphWebhook approach
+**Runtime:** Node.js 20 (TypeScript compiled to JavaScript)
 
-## AI Integration
+**Hosting Plan:** Consumption (Y1) - auto-scales, pay-per-execution
 
-### Triage (Keyword-Based)
-Currently uses keyword matching in `AIService.ts`:
-- **Categories**: Network, Access, Billing, Software, Other
-- **Priorities**: High, Medium, Low
-- **Accuracy**: 100% on test scenarios
+**Deployed Functions:**
 
-### RAG Search (Python Function)
-- **Endpoint**: `func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search`
-- **Features**: 
-  - Semantic search via Azure AI Search
-  - Score-based confidence calculation (0.1-0.9)
-  - Uses STANDARD tier semantic ranking
-- **Confidence Mapping**:
-  - score ≥3.5 → 0.9 confidence
-  - score ≥3.0 → 0.8 confidence  
-  - score ≥2.0 → 0.6 confidence
-  - score ≥1.0 → 0.4 confidence
-  - score <1.0 → 0.2 confidence
+**1. GraphWebhook** (MAIN - Event-Driven Entry Point)
+- **Trigger:** HTTP POST from Microsoft Graph
+- **Auth:** Anonymous (required for Graph validation - Microsoft posts to this endpoint)
+- **Purpose:** Real-time email processing when new message arrives
+- **Logic:**
+  1. Validates webhook request (clientState security token)
+  2. Checks if email is from support address (prevents infinite loop if we reply to ourselves)
+  3. Queries Table Storage to check for duplicate EmailMessageId
+  4. If new: processes email through triage \u2192 RAG \u2192 ticket creation pipeline
+- **Response Time:** <10 seconds end-to-end
+- **Cost:** \ (within free tier for typical volume)
 
-## Graph API Integration
+**2. ManageSubscription** (Webhook Management)
+- **Trigger:** HTTP GET/POST/DELETE
+- **Auth:** Function key required (manual management endpoint)
+- **Purpose:** Create, renew, and list Microsoft Graph webhook subscriptions
+- **Operations:**
+  - GET: List active subscriptions
+  - POST: Create new subscription (expires in 3 days)
+  - DELETE: Remove subscription
+- **Why Needed:** Microsoft Graph webhooks expire after 3 days, must be renewed
+- **Note:** Set up automated renewal or manual renewal every 3 days
 
-### Required Permissions (Application-level)
-- `Mail.Read` - Read emails from monitored mailbox
-- `Mail.Send` - Send auto-reply emails
-- `User.Read.All` - Access user information
+**3. ProcessSupportEmail** (Manual Processing)
+- **Trigger:** HTTP GET/POST
+- **Auth:** Function key required
+- **Purpose:** Batch process all unread emails (bypasses webhook)
+- **Use Cases:**
+  - Webhook subscription expired
+  - Backlog of emails to process
+  - Testing triage/RAG changes on historical data
+- **When to Use:** Not needed if webhook is active; useful for troubleshooting
 
-### Monitored Mailbox
-- **Email**: AdeleV@hscluise.onmicrosoft.com
-- **Webhook**: Instant notifications on new email arrival
-- **Subscription Renewal**: Required every 3 days
+**4. PingStorage** (Health Check)
+- **Trigger:** HTTP GET
+- **Auth:** Anonymous
+- **Purpose:** Verifies connectivity to Table Storage
+- **Returns:** Test ticket ID if storage is working
+- **Use Case:** Quick health check for monitoring/alerts
 
-## Table Storage Schema
+**5. CheckMailboxTimer** (DISABLED - Legacy)
+- **Status:** Disabled due to infinite loop risk
+- **Original Purpose:** Poll mailbox every 5 minutes for new emails
+- **Why Disabled:** Caused emails to be processed multiple times; replaced by event-driven GraphWebhook
 
-### SupportTickets Table
-- **Partition Key**: `TICKET` (all tickets in same partition)
-- **Row Key**: `TKT-YYYYMMDD-XXXXXX` (unique ticket ID)
-- **Fields**:
-  - `TicketID`: Display ID (same as row key)
-  - `Title`: Email subject
-  - `Description`: Email body content
-  - `CustomerEmail`: From address
-  - `Category`: Network, Access, Billing, Software, Other
-  - `Priority`: High, Medium, Low
-  - `Status`: New, AI Resolved - Awaiting Confirmation, Needs Human Review
-  - `AIResponse`: Generated answer from RAG
-  - `Confidence`: 0.1-0.9 (determines auto-resolve vs escalation)
-  - `EmailMessageId`: Microsoft Graph message ID (for deduplication)
-  - `Timestamp`: Creation date/time
+### Azure Table Storage (\stagents*\)
 
-## Deployment
+**Purpose:** Persistent NoSQL storage for support tickets
 
-### Prerequisites
-- Azure Storage Account (created via Bicep infrastructure)
-- App Registration with Graph API permissions (admin consented)
-- Function App deployed to Sweden Central
+**Why Table Storage (vs Cosmos DB or SQL):**
+- **Cost:** Very cheap (\.045 per GB/month vs \+ for SQL)
+- **Scalability:** Handles millions of tickets effortlessly
+- **Simple Schema:** Key-value access pattern, no complex queries needed
+- **Performance:** <10ms read/write latency
 
-### Deploy Function Code
-```bash
-cd demos/04-real-ticket-creation/function
-npm install
-npm run build
-func azure functionapp publish func-agents-dw7z4hg4ssn2k
-```
+**Schema: SupportTickets Table**
 
-### Required Environment Variables
+**Partition Key:** \TICKET\ (all tickets in same partition - acceptable for demo, optimize for production)
 
-Configured in Function App Settings:
-```
-GRAPH_CLIENT_ID=196247e7-0fda-4e17-ad3c-cd71679f76b7
-GRAPH_CLIENT_SECRET=<from-key-vault>
-GRAPH_TENANT_ID=b469e370-d6a6-45b5-928e-856ae0307a6d
-SUPPORT_EMAIL_ADDRESS=AdeleV@hscluise.onmicrosoft.com
-STORAGE_ACCOUNT_NAME=stagentsdw7z4hg4ssn2k
-STORAGE_ACCOUNT_KEY=<auto-configured-via-bicep>
-RAG_ENDPOINT=https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search
-RAG_API_KEY=<function-key>
-```
+**Row Key:** \TKT-YYYYMMDD-XXXXXX\ (e.g., \TKT-20251115-A3B7F2\)
+- Format ensures chronological sorting
+- 6-character random suffix prevents collisions
 
-## Testing
+**Fields:**
+| Field | Type | Purpose | Example |
+|-------|------|---------|---------|
+| \TicketID\ | string | Display ID (same as Row Key) | TKT-20251115-A3B7F2 |
+| \Title\ | string | Email subject | "VPN not connecting" |
+| \Description\ | string | Email body content | "Can't connect to VPN from home..." |
+| \CustomerEmail\ | string | Sender's email address | customer@example.com |
+| \Category\ | string | Triage category | Network, Access, Billing, Software, Other |
+| \Priority\ | string | Triage priority | High, Medium, Low |
+| \Status\ | string | Processing status | New, AI Resolved, Needs Human Review |
+| \AIResponse\ | string | Generated answer from RAG | "To fix VPN issues: 1. Check firewall..." |
+| \Confidence\ | number | RAG confidence score | 0.85 (range: 0.1-0.9) |
+| \EmailMessageId\ | string | Graph message ID (for deduplication) | AAMkAGZjOT... |
+| \Timestamp\ | datetime | Ticket creation time | 2025-11-15T13:45:00Z |
 
-### Test Production Webhook
-Send email to: `AdeleV@hscluise.onmicrosoft.com`
+**Deduplication Logic:**
+Before creating ticket, query Table Storage:
+\\\	ypescript
+const duplicate = await tableClient.getEntity("TICKET", emailMessageId);
+if (duplicate) return; // Skip processing
+\\\
 
-Expected flow:
-1. Email arrives in mailbox
-2. Graph webhook triggers instantly
-3. GraphWebhook function processes email
-4. Ticket created in Table Storage
-5. Auto-reply sent (if confidence ≥0.7) or forwarded to support team
+### Microsoft Graph API (M365 Integration)
 
-### Check Webhook Status
-```powershell
-$functionKey = "YOUR_FUNCTION_KEY_HERE"
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription" `
-  -Method Get -Headers @{ "x-functions-key" = $functionKey }
-```
+**Purpose:** Read emails and send auto-replies
 
-### Manual Email Processing (Bypass Webhook)
-```powershell
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/processsupportemail" `
-  -Method Get -Headers @{ "x-functions-key" = $functionKey }
-```
+**Authentication:** App Registration with Application Permissions
 
-### Verify Table Storage
-Azure Portal → Storage Account → Tables → SupportTickets
+**Required Permissions (admin consent required):**
+- \Mail.Read\ - Read all mailboxes
+- \Mail.Send\ - Send mail as any user
+- \User.Read.All\ - Read user profiles
 
-Or use PowerShell test scripts:
-- `tests/e2e-test.ps1` - Full 3-scenario validation
-- `tests/quick-test.ps1` - Single VPN test
+**Webhook Subscription:**
+- **Resource:** \/users/{email}/mailFolders/Inbox/messages\
+- **Change Type:** \created\ (trigger on new email only)
+- **Notification URL:** GraphWebhook function endpoint
+- **Expiration:** 3 days (4320 minutes) - Microsoft Graph limitation
+- **Client State:** Random secret token for validation
 
-## Local Development
+**How Webhook Works:**
+1. User emails your support address
+2. Microsoft Graph detects new email in monitored mailbox
+3. Graph POSTs notification to GraphWebhook function: \{"\u0040odata.type":"#Microsoft.Graph.ChangeNotification","resource":"..."}\
+4. Function validates clientState, fetches email details, processes
 
-```bash
-# Copy settings template
-cp local.settings.json.example local.settings.json
+**Why Webhook vs Polling:**
+- **Latency:** Instant (<2s) vs 5-minute delay
+- **Cost:** Pay only when email arrives vs continuous polling
+- **Reliability:** No missed emails during downtime
 
-# Add credentials to local.settings.json
-# (Graph secrets, Storage keys, RAG endpoint)
+### Python RAG Function (\unc-rag-*\)
 
-# Start function locally
-npm install
-npm run build
-func start
+**Purpose:** Semantic search and answer generation
 
-# Test locally
-curl http://localhost:7071/api/pingstorage
-```
+**Runtime:** Python 3.11
 
-## Key Files
+**Hosting Plan:** Consumption (Y1)
 
-- `src/functions/GraphWebhook.ts` - **Main**: Real-time email webhook handler
-- `src/functions/ManageSubscription.ts` - Webhook subscription manager
-- `src/functions/ProcessSupportEmail.ts` - Manual batch processing
-- `src/functions/PingStorage.ts` - Health check endpoint
-- `src/services/AIService.ts` - Triage (keyword) + RAG calls
-- `src/services/GraphService.ts` - Email CRUD operations
-- `src/services/TableStorageService.ts` - Ticket persistence + deduplication
-- `src/models/Ticket.ts` - TypeScript interfaces
+**How It's Called:**
+\\\	ypescript
+const response = await fetch(process.env.RAG_ENDPOINT, {
+  method: 'POST',
+  headers: { 'x-functions-key': process.env.RAG_API_KEY },
+  body: JSON.stringify({ query: emailBody })
+});
+\\\
 
-## Monitoring
+**What It Does:**
+1. Receives user question
+2. Generates embedding via Azure OpenAI (text-embedding-3-large)
+3. Hybrid search in Azure AI Search (vector + keyword + semantic)
+4. Scores results using semantic reranker (0-4)
+5. Maps score to confidence (0.1-0.9)
+6. Generates answer via GPT-4o-mini with top retrieved passages as context
+7. Returns: \{answer: "...", confidence: 0.85, sources: [...]}\
 
-Application Insights queries:
-```kql
-// Recent email processing
-traces
-| where operation_Name == "GraphWebhook"
-| order by timestamp desc
-| take 50
+**Confidence Thresholds:**
+- \u22650.7: Auto-reply to customer (high confidence)
+- <0.7: Escalate to human review (low confidence or ambiguous)
 
-// Tickets created
+See [Demo 02 README](../../02-rag-search/README.md) for detailed RAG architecture.
+
+### Application Insights (\ppi-smart-agents-*\)
+
+**Purpose:** End-to-end observability and monitoring
+
+**What Gets Logged:**
+
+**1. Request Traces**
+- Every function execution with duration
+- HTTP status codes and response sizes
+- Correlation IDs linking email \u2192 triage \u2192 RAG \u2192 ticket
+
+**2. Custom Events**
+- \EmailProcessed\: New email received
+- \TicketCreated\: Ticket stored in Table Storage
+- \AutoReply\: High-confidence auto-reply sent
+- \Escalated\: Low-confidence escalation to human
+
+**3. Dependencies**
+- Graph API calls (read email, send reply)
+- Table Storage queries (deduplication, ticket creation)
+- RAG function HTTP calls
+
+**4. Exceptions**
+- Stack traces for errors
+- Failed RAG calls
+- Graph API auth failures
+
+**KQL Query Examples:**
+\\\kusto
+// Average confidence by category
 customEvents
 | where name == "TicketCreated"
-| project timestamp, ticketId=tostring(customDimensions.ticketId), 
-          category=tostring(customDimensions.category),
-          confidence=todouble(customDimensions.confidence)
-```
+| extend confidence = todouble(customDimensions.confidence)
+| summarize avg(confidence) by tostring(customDimensions.category)
 
-## Validation Results
+// Processing time breakdown
+requests
+| where operation_Name == "GraphWebhook"
+| summarize avg(duration), max(duration), percentile(duration, 95)
+\\\
 
-**Test Date**: November 14, 2025
+## Configuration Requirements
 
-### ✅ Automated Tests Passed
+All environment variables are configured in Function App Settings (see main [README.md](../../../README.md) for deployment):
 
-#### 1. ManageSubscription Endpoint
-```powershell
-GET /api/managesubscription
-```
-**Result**: ✅ Working
-- Active webhook subscription: `da76d883-3d70-4039-9ce0-163b57ca552b`
-- Monitoring: `AdeleV@hscluise.onmicrosoft.com` inbox
-- Expires: November 17, 2025 13:52:18 UTC
-- Notification URL: `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook`
+**Required:**
+- \GRAPH_CLIENT_ID\, \GRAPH_CLIENT_SECRET\, \GRAPH_TENANT_ID\ - App registration credentials
+- \SUPPORT_EMAIL\ - Monitored mailbox address
+- \STORAGE_ACCOUNT_NAME\, \STORAGE_ACCOUNT_KEY\ - Table Storage connection
+- \RAG_ENDPOINT\, \RAG_API_KEY\ - RAG function endpoint
 
-#### 2. RAG Search Function
-```powershell
-POST https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag_search
-Body: {"query":"VPN disconnects"}
-```
-**Result**: ✅ Working
-- Confidence: 0.8 (score-based calculation)
-- Response: Complete VPN troubleshooting guide (5 steps)
-- Endpoint: `rag_search` (underscore, not hyphen)
+**Optional:**
+- \APPINSIGHTS_CONNECTION_STRING\ - Monitoring (auto-configured via Bicep)
 
-#### 3. ProcessSupportEmail - Direct POST Mode
-```powershell
-POST /api/processsupportemail
-Body: {
-  "subject": "VPN keeps disconnecting",
-  "body": "My VPN disconnects every 5 minutes. Need help!",
-  "from": "test@example.com"
-}
-```
-**Result**: ✅ Working
-- **Ticket Created**: TKT-20251114-KQ7PZ9
-- **Category**: Network (keyword-based triage)
-- **Priority**: Medium
-- **Confidence**: 0.8
-- **AI Response**: Full VPN troubleshooting steps
-- **Table Storage**: Confirmed (rowKey: 1763142246079-rmzlpa)
-- **Duration**: 16.7 seconds (from Application Insights)
+## Next Steps
 
-**Response JSON**:
-```json
-{
-  "ticketId": "TKT-20251114-KQ7PZ9",
-  "category": "Network",
-  "priority": "Medium",
-  "status": "New",
-  "confidence": 0.8,
-  "suggestedResponse": "If your VPN disconnects every few minutes...",
-  "message": "Ticket created successfully"
-}
-```
-
-#### 4. PingStorage Health Check
-```powershell
-GET /api/pingstorage
-```
-**Result**: ✅ Working
-- Creates test ticket in Table Storage
-- Returns ticket ID
-- Confirms storage connectivity
-
-### 📧 Manual Tests Required
-
-**These tests require sending real emails to AdeleV@hscluise.onmicrosoft.com:**
-
-1. **Webhook Email Flow** - Send email from external address
-   - Verify webhook notification received within seconds
-   - Check ticket created in Table Storage
-   - Verify auto-reply sent (if confidence ≥0.7) or forward to support team
-
-2. **Deduplication** - Send same email twice
-   - First email should create ticket
-   - Second email should be skipped (duplicate detected)
-   - Check Application Insights for "already processed" message
-
-3. **Self-Email Filter** - Send email from AdeleV@ to AdeleV@
-   - Email should be skipped to prevent infinite loop
-   - Check Application Insights for "SKIPPING email from ourselves" message
-
-4. **Test Scenarios**:
-   - Password reset request (should categorize as "Access")
-   - Billing question (should categorize as "Billing")
-   - Software installation (should categorize as "Software")
-   - Urgent/critical issue (should set priority to "High")
-
-### 🔍 Table Storage Verification
-
-**Query Recent Tickets**:
-```powershell
-az storage entity query \
-  --account-name stagentsdw7z4hg4ssn2k \
-  --table-name SupportTickets \
-  --filter "PartitionKey eq 'TICKET'" \
-  --select TicketID,Title,Category,Priority,Confidence,CustomerEmail \
-  --num-results 10
-```
-
-**Example Ticket** (TKT-20251114-KQ7PZ9):
-```json
-{
-  "TicketID": "TKT-20251114-KQ7PZ9",
-  "Title": "VPN keeps disconnecting",
-  "Category": "Network",
-  "Priority": "Medium",
-  "Confidence": 0.8,
-  "CustomerEmail": "test@example.com",
-  "AIResponse": "If your VPN disconnects every few minutes, try the following solutions:\n\n1. **Check Internet Connection**...\n2. **Update VPN Client**...\n3. **Change VPN Protocols**...\n4. **Adjust MTU Size**...\n5. **Disable Power Saving**...\n\nIf the problem persists after trying these steps, consider contacting IT support for further assistance."
-}
-```
-
-### ✅ Production Status
-
-**Current State**: Demo 04 is **FULLY FUNCTIONAL** for automated testing.
-
-**Verified Components**:
-- ✅ Webhook subscription active and monitored
-- ✅ RAG search with score-based confidence (0.6-0.9 range)
-- ✅ Keyword-based triage (Network, Access, Billing, Software categories)
-- ✅ Table Storage persistence with deduplication
-- ✅ Ticket ID generation and tracking
-- ✅ AI response generation from knowledge base
-- ✅ Application Insights logging and monitoring
-
-**Pending Verification**:
-- 📧 Real webhook email flow (requires manual email send)
-- 📧 Auto-reply vs escalation logic (based on confidence threshold)
-- 📧 Deduplication filter
-- 📧 Self-email infinite loop prevention
-
-**Known Limitations**:
-- Webhook subscription expires every 3 days (requires renewal)
-- Keyword-based triage (prompt flow not deployed)
-- Knowledge base limited to 10 documents
-- No automatic subscription renewal
-
-### 📝 Test Commands Reference
-
-**Get Function Keys**:
-```powershell
-# Email Processing Function
-az functionapp keys list --name func-agents-dw7z4hg4ssn2k --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
-
-# RAG Function
-az functionapp keys list --name func-rag-dw7z4hg4ssn2k --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
-```
-
-**Check Recent Logs**:
-```powershell
-az monitor app-insights query \
-  --app appi-smart-agents-dw7z4hg4ssn2k \
-  --resource-group rg-smart-agents-dev \
-  --analytics-query "traces | where timestamp > ago(10m) | order by timestamp desc | take 20"
-```
-
-**Renew Webhook Subscription**:
-```powershell
-# POST to create new subscription (if expired)
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription" `
-  -Method Post -Headers @{ "x-functions-key" = "YOUR_FUNCTION_KEY_HERE" }
-```
-
+For deployment and testing instructions, see:
+- **Main README:** [../../../README.md](../../../README.md)
+- **Webhook Management:** [../../../docs/WEBHOOK-MANAGEMENT.md](../../../docs/WEBHOOK-MANAGEMENT.md)
+- **Test Scenarios:** [../../../tests/TEST-EMAIL-SCENARIOS.md](../../../tests/TEST-EMAIL-SCENARIOS.md)
