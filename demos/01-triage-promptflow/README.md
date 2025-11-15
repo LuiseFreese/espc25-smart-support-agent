@@ -316,11 +316,3 @@ az ml online-endpoint invoke \
 - Simple single-prompt scenarios
 - Cost-sensitive applications (avoid Prompt Flow overhead)
 
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Connection error | Verify `AZURE_OPENAI_ENDPOINT` and managed identity authentication |
-| Invalid JSON output | Ensure `temperature: 0.0` and `response_format: json_object` |
-| Flow validation fails | Run `pf flow validate -f flow.dag.yaml --verbose` |
-| Classification inconsistent | Lower temperature or add more examples to system prompt |

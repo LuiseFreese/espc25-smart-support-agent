@@ -1,13 +1,27 @@
 # Test Demo 02: RAG Search Function
 # Tests the RAG search endpoint with various support scenarios
 
-$ragKey = $env:RAG_KEY
-if (-not $ragKey) {
-    Write-Host "ERROR: Environment variable RAG_KEY not set!" -ForegroundColor Red
-    Write-Host "Set it with: `$env:RAG_KEY = 'YOUR_KEY_HERE'" -ForegroundColor Yellow
+# Load environment variables from .env file
+if (Test-Path ".env") {
+    Get-Content ".env" | ForEach-Object {
+        if ($_ -match '^([^#].+?)=(.+)$') {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            Set-Item -Path "env:$key" -Value $value
+        }
+    }
+    Write-Host "✓ Loaded configuration from .env" -ForegroundColor Green
+}
+
+$ragKey = $env:RAG_FUNCTION_KEY
+$ragEndpoint = $env:RAG_FUNCTION_URL
+if (-not $ragKey -or -not $ragEndpoint) {
+    Write-Host "ERROR: Missing RAG configuration!" -ForegroundColor Red
+    Write-Host "Make sure .env file exists with RAG_FUNCTION_KEY and RAG_FUNCTION_URL" -ForegroundColor Yellow
     exit 1
 }
-$ragEndpoint = "https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search"
+
+$ragEndpoint = "$ragEndpoint/api/rag-search"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Demo 02: RAG Search Validation" -ForegroundColor Cyan

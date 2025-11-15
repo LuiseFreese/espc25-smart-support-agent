@@ -23,13 +23,13 @@ Email arrives → Graph webhook → Triage (Demo 01 logic) → RAG search (Demo 
 
 ```mermaid
 graph LR
-    A[Email Arrives] --> B[Graph Webhook]
-    B --> C{Triage<br/>Demo 01 Logic}
-    C --> D[RAG Search<br/>Demo 02 Function]
-    D --> E{Confidence<br/>Score}
-    E -->|High ≥0.7| F[Auto-Reply<br/>to Customer]
-    E -->|Low <0.7| G[Escalate to<br/>Support Team]
-    F --> H[Create Ticket<br/>Demo 03 Pattern]
+    A[Email Arrives] --> B[Graph Webhook<br/>triggers func-agents]
+    B --> C[Keyword Triage<br/>VPN → Network<br/>Password → Access]
+    C --> D[HTTP Call to func-rag<br/>Hybrid search + embeddings]
+    D --> E{Confidence<br/>Score ≥0.7?}
+    E -->|High| F[Auto-Reply<br/>to Customer]
+    E -->|Low| G[Escalate to<br/>Support Team]
+    F --> H[Create Ticket<br/>Table Storage]
     G --> H
     
     style A fill:#0078d4,color:#fff
@@ -41,12 +41,14 @@ graph LR
 ```
 
 **What Gets Deployed to Azure:**
-- **func-agents-*** (Node.js 20): Email processing with keyword triage + ticket creation
-- **func-rag-*** (Python 3.11): RAG search with confidence scoring
+- **func-agents** (Node.js): Webhook receiver → keyword triage → calls func-rag → creates ticket → sends reply
+- **func-rag** (Python): HTTP endpoint that searches knowledge base → returns answer + confidence score
 
-**What's Reference-Only:**
-- **Demo 01:** Shows Prompt Flow structure (logic implemented as keyword matching in Demo 04)
-- **Demo 03:** Shows function calling pattern (used for ticket creation in Demo 04)
+**How Demos Map to Production Code:**
+- **Demo 01 teaches:** Prompt engineering for classification → **Production uses:** Keyword matching (simpler, 100% accurate)
+- **Demo 02 teaches:** RAG pipeline with embeddings → **Production uses:** Deployed as `func-rag` HTTP function
+- **Demo 03 teaches:** Function calling pattern → **Production uses:** Ticket creation code in `func-agents`
+- **Demo 04 is:** The complete orchestrator that combines all patterns into one workflow
 
 Each demo builds on the previous, culminating in a production-ready system that auto-resolves 60-80% of support tickets.
 
@@ -76,6 +78,29 @@ Required only for **Demo 04** (email processing):
 - App registration with Graph API permissions (`Mail.Read`, `Mail.Send`)
 - Admin consent for application permissions
 
+## Quick Start (TL;DR)
+
+```powershell
+# 1. Deploy infrastructure (~15 minutes)
+az login
+az deployment sub create --location eastus --template-file infra/main.bicep --parameters @infra/parameters.dev.json
+
+# 2. Setup environment (auto-gathers all keys)
+.\scripts\setup-env.ps1
+
+# 3. Ingest knowledge base
+python demos/02-rag-search/ingest-kb.py
+
+# 4. Test RAG function
+.\tests\test-demo02-rag.ps1
+
+# 5. (Optional) Setup Graph webhook for Demo 04
+.\scripts\setup-graph-webhook.ps1 -SupportEmail "support@yourdomain.com"
+```
+
+**Done!** Your AI support agent is ready. Send a test email or explore individual demos below.
+
+---
 
 ## Getting Started
 
@@ -110,46 +135,34 @@ az deployment sub show --name <deployment-name> --query properties.outputs
 
 **Deployment Time:** ~10-15 minutes
 
-### Step 2: Configure Environment Variables
+### Step 2: Setup Environment Variables
 
-**For Azure deployment**, the Bicep templates automatically configure all settings in the Function Apps.
+After infrastructure deployment, run the setup script to gather all resource keys automatically:
 
-**For local development** (optional), update `local.settings.json` files with your deployed resource values:
-
-**Demo 02 RAG Function** (`demos/02-rag-search/rag-function/local.settings.json`):
-```json
-{
-  "AZURE_AI_SEARCH_ENDPOINT": "https://srch-agents-<random>.search.windows.net",
-  "AZURE_AI_SEARCH_API_KEY": "<get-from-portal>",
-  "AZURE_OPENAI_ENDPOINT": "https://oai-agents-<random>.openai.azure.com/"
-}
-```
-
-**Demo 04 Email Function** (`demos/04-real-ticket-creation/function/local.settings.json`):
-```json
-{
-  "GRAPH_CLIENT_ID": "<app-registration-id>",
-  "GRAPH_CLIENT_SECRET": "<app-registration-secret>",
-  "GRAPH_TENANT_ID": "<tenant-id>",
-  "SUPPORT_EMAIL_ADDRESS": "support@yourdomain.com",
-  "STORAGE_ACCOUNT_NAME": "stagents<random>",
-  "STORAGE_ACCOUNT_KEY": "<get-from-portal>"
-}
-```
-
-**Get Values from Deployment:**
 ```powershell
-# Get deployment outputs
-az deployment sub show \
-  --name smart-agents-deployment \
-  --query properties.outputs -o json
-
-# Get API keys
-az search admin-key show --service-name srch-agents-<random> --resource-group rg-smart-agents-dev
-az storage account keys list --name stagents<random> --resource-group rg-smart-agents-dev
+# Automatically gathers all Azure resource keys and creates .env file
+.\scripts\setup-env.ps1
 ```
 
-> **Note:** Local settings are only needed for running functions locally with `func start`. Deployed functions get settings automatically from Bicep.
+**What this script does:**
+- ✅ Finds all deployed resources in your resource group
+- ✅ Retrieves API keys for AI Search and OpenAI
+- ✅ Gets function keys for both deployed functions
+- ✅ Creates `.env` file with all configuration
+
+**Output:**
+```
+✓ Found resources:
+  - AI Search: srch-agents-abc123
+  - OpenAI: oai-agents-abc123
+  - RAG Function: func-rag-abc123
+  - Agents Function: func-agents-abc123
+✓ .env file created successfully!
+```
+
+The `.env` file is automatically loaded by test scripts and is excluded from git (contains secrets).
+
+**Alternative (Manual):** If you prefer manual configuration, see the `.env.example` file for all required variables.
 
 ### Step 3: Ingest Knowledge Base (Demo 02)
 
@@ -323,45 +336,6 @@ Most setup is automated via Bicep, but a few steps need your input:
 - **Custom Email Domain:** Configure in Microsoft 365, update `SUPPORT_EMAIL_ADDRESS`
 - **Monitoring Alerts:** Set up Application Insights alerts for errors/budget
 - **Knowledge Base Expansion:** Add more documents to improve coverage
-
-## Architecture Overview
-
-**Real Production Flow:**
-
-```mermaid
-graph LR
-    A[Email Arrives] --> B[Graph Webhook<br/>Triggers func-agents]
-    
-    B --> C[Demo 04 Function<br/>Node.js]
-    
-    C --> D[1. Keyword Triage<br/>Demo 01 logic]
-    D --> E[2. HTTP Call to<br/>func-rag Python]
-    
-    E --> F{3. Confidence<br/>Score ≥0.7?}
-    
-    F -->|High| G[Auto-Reply<br/>to Customer]
-    F -->|Low| H[Escalate to<br/>Support Team]
-    
-    G --> I[4. Create Ticket<br/>Demo 03 pattern<br/>Table Storage]
-    H --> I
-    
-    style A fill:#0078d4,color:#fff
-    style C fill:#ffb900,color:#000
-    style E fill:#0078d4,color:#fff
-    style F fill:#50e6ff,color:#000
-    style G fill:#107c10,color:#fff
-    style H fill:#d13438,color:#fff
-```
-
-**What Gets Deployed:**
-- **func-agents-*** (Node.js): Receives webhook → triages → calls RAG → creates ticket → replies
-- **func-rag-*** (Python): Receives HTTP request → searches knowledge base → returns answer + confidence
-
-**How Demos Map to Production:**
-- **Demo 01 logic** = Keyword matching inside func-agents
-- **Demo 02** = Deployed as func-rag (called by func-agents via HTTP)
-- **Demo 03 pattern** = Ticket creation code inside func-agents
-- **Demo 04** = The func-agents function that orchestrates everything
 
 ## Project Structure
 
