@@ -7,9 +7,11 @@ import { AzureOpenAI } from 'openai';
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT!;
+const OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY;
 const OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
 const OPENAI_API_VERSION = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview';
 const FUNCTION_BASE_URL = process.env.AZURE_FUNCTION_APP_URL || 'https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api';
+const USE_MANAGED_IDENTITY = process.env.USE_MANAGED_IDENTITY === 'true';
 
 // Debug: Check if endpoint is loaded
 if (!OPENAI_ENDPOINT) {
@@ -18,17 +20,40 @@ if (!OPENAI_ENDPOINT) {
   process.exit(1);
 }
 
-// Initialize Azure OpenAI client with Managed Identity / Azure CLI auth
-const credential = new DefaultAzureCredential();
-const scope = 'https://cognitiveservices.azure.com/.default';
-const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
-const client = new AzureOpenAI({
-  azureADTokenProvider,
-  deployment: OPENAI_DEPLOYMENT,
-  apiVersion: OPENAI_API_VERSION,
-  endpoint: OPENAI_ENDPOINT,
-});
+// Initialize Azure OpenAI client
+// Priority: 1) USE_MANAGED_IDENTITY flag, 2) API key if present, 3) Managed Identity fallback
+let client: AzureOpenAI;
+if (USE_MANAGED_IDENTITY) {
+  console.log('✓ Using Managed Identity authentication (USE_MANAGED_IDENTITY=true)');
+  const credential = new DefaultAzureCredential();
+  const scope = 'https://cognitiveservices.azure.com/.default';
+  const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+  client = new AzureOpenAI({
+    azureADTokenProvider,
+    deployment: OPENAI_DEPLOYMENT,
+    apiVersion: OPENAI_API_VERSION,
+    endpoint: OPENAI_ENDPOINT,
+  });
+} else if (OPENAI_API_KEY) {
+  console.log('✓ Using API key authentication');
+  client = new AzureOpenAI({
+    apiKey: OPENAI_API_KEY,
+    deployment: OPENAI_DEPLOYMENT,
+    apiVersion: OPENAI_API_VERSION,
+    endpoint: OPENAI_ENDPOINT,
+  });
+} else {
+  console.log('✓ Using Managed Identity authentication (no API key found)');
+  const credential = new DefaultAzureCredential();
+  const scope = 'https://cognitiveservices.azure.com/.default';
+  const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+  client = new AzureOpenAI({
+    azureADTokenProvider,
+    deployment: OPENAI_DEPLOYMENT,
+    apiVersion: OPENAI_API_VERSION,
+    endpoint: OPENAI_ENDPOINT,
+  });
+}
 
 interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool';
