@@ -52,12 +52,12 @@ else {
     Write-Host "   ⚠ Demo 03 not found, skipping..." -ForegroundColor Yellow
 }
 
-# Deploy Demo 04b - Email to Storage
-$demo04bPath = Join-Path $PSScriptRoot "..\demos\04b-real-ticket-creation\function"
+# Deploy Demo 04 - Real Ticket Creation (Email Webhook System)
+$demo04Path = Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function"
 
-if (Test-Path $demo04bPath) {
-    Write-Host "   [Demo 04b] Deploying Email-to-Storage..." -ForegroundColor Cyan
-    Push-Location $demo04bPath
+if (Test-Path $demo04Path) {
+    Write-Host "   [Demo 04] Deploying Real Ticket Creation System..." -ForegroundColor Cyan
+    Push-Location $demo04Path
 
     try {
         npm install --silent
@@ -65,10 +65,10 @@ if (Test-Path $demo04bPath) {
         func azure functionapp publish $FunctionAppName
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "   ✓ Demo 04b deployed successfully" -ForegroundColor Green
+            Write-Host "   ✓ Demo 04 deployed successfully" -ForegroundColor Green
         }
         else {
-            Write-Host "   ⚠ Demo 04b deployment had issues" -ForegroundColor Yellow
+            Write-Host "   ⚠ Demo 04 deployment had issues" -ForegroundColor Yellow
         }
     }
     finally {
@@ -76,7 +76,7 @@ if (Test-Path $demo04bPath) {
     }
 }
 else {
-    Write-Host "   ⚠ Demo 04b not found, skipping..." -ForegroundColor Yellow
+    Write-Host "   ⚠ Demo 04 not found, skipping..." -ForegroundColor Yellow
 }
 
 # Wait for deployment to complete
@@ -102,15 +102,15 @@ if (Test-Path (Join-Path $PSScriptRoot "..\demos\03-agent-with-tools\function-to
     }
 }
 
-# Test Demo 04b endpoints if deployed
-if (Test-Path (Join-Path $PSScriptRoot "..\demos\04b-real-ticket-creation\function")) {
-    $pingStorageUrl = "https://$FunctionAppName.azurewebsites.net/api/pingstorage"
+# Test Demo 04 endpoints if deployed
+if (Test-Path (Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function")) {
+    $pingStorageUrl = "https://$FunctionAppName.azurewebsites.net/api/PingStorage"
 
     try {
-        Write-Host "   [Demo 04b] Testing PingStorage..." -ForegroundColor Cyan
+        Write-Host "   [Demo 04] Testing PingStorage..." -ForegroundColor Cyan
         $pingResponse = Invoke-RestMethod -Uri $pingStorageUrl -Method Get -ErrorAction Stop
         Write-Host "   ✓ PingStorage working: $($pingResponse.message)" -ForegroundColor Green
-        Write-Host "     Created ticket: $($pingResponse.rowKey)" -ForegroundColor Gray
+        Write-Host "     Connection verified" -ForegroundColor Gray
     }
     catch {
         Write-Host "   ⚠ PingStorage test failed: $($_.Exception.Message)" -ForegroundColor Yellow
