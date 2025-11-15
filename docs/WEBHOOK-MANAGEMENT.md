@@ -2,7 +2,7 @@
 
 ## Overview
 
-The system uses Microsoft Graph Change Notifications (webhooks) for **real-time, event-driven email processing**. When an email arrives at `AdeleV@hscluise.onmicrosoft.com`, Microsoft Graph immediately sends a notification to the `GraphWebhook` Azure Function, which processes it within seconds.
+The system uses Microsoft Graph Change Notifications (webhooks) for **real-time, event-driven email processing**. When an email arrives at `YOUR_SUPPORT_EMAIL@yourdomain.com`, Microsoft Graph immediately sends a notification to the `GraphWebhook` Azure Function, which processes it within seconds.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ $result | ConvertTo-Json
   "subscriptions": [
     {
       "id": "dfb66a7c-f4f2-484c-913b-4abd23c230ce",
-      "resource": "/users/AdeleV@hscluise.onmicrosoft.com/mailFolders/Inbox/messages",
+      "resource": "/users/YOUR_SUPPORT_EMAIL@yourdomain.com/mailFolders/Inbox/messages",
       "changeType": "created",
       "expirationDateTime": "2025-11-15T16:50:25.492Z",
       "notificationUrl": "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook"
@@ -253,7 +253,7 @@ foreach ($sub in $subs.subscriptions) {
 ```
 WEBHOOK_URL=https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook
 WEBHOOK_CLIENT_STATE=SmartSupportAgent2025
-SUPPORT_EMAIL_ADDRESS=AdeleV@hscluise.onmicrosoft.com
+SUPPORT_EMAIL_ADDRESS=YOUR_SUPPORT_EMAIL@yourdomain.com
 GRAPH_CLIENT_ID=<app-registration-id>
 GRAPH_CLIENT_SECRET=<app-secret>
 GRAPH_TENANT_ID=<tenant-id>

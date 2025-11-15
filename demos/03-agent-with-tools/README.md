@@ -1,103 +1,296 @@
-# Demo 03: Agent with Tool Use
+# Demo 03: Agent with Tool Use (Function Calling)
 
-This demo shows an **autonomous agent** using Azure OpenAI function calling to execute actions via Azure Functions.
+This demo shows an autonomous agent using Azure OpenAI function calling to execute business logic via Azure Functions.
+
+## What This Demo Shows
+
+- **Function calling** (tool use) with Azure OpenAI
+- **Autonomous decision-making** by the AI model
+- **Serverless tool execution** via Azure Functions
+- **End-to-end observability** with Application Insights
 
 ## Azure Resources Used
 
-### 1. **Azure OpenAI Service** (`oai-agents-*`)
-- **Purpose**: Provides the agent's reasoning and tool selection capabilities
-- **Why**: GPT-4o-mini has native function calling support
-- **How it's used**:
-  - **Step 1**: User asks "Where is order 12345?"
-  - **Step 2**: Model analyzes query, decides to call `GetOrderStatus` function
-  - **Step 3**: Function executes, returns order data
-  - **Step 4**: Model synthesizes natural language response
-- **Feature**: Function calling (tool use) with JSON schema definitions
-- **Cost**: ~$0.0003 per query (includes tool selection + final answer)
+### Azure OpenAI Service (`oai-agents-*`)
 
-### 2. **Azure Functions** (`func-agents-*`)
-- **Purpose**: Serverless HTTP endpoints that execute business logic
-- **Why**: Scalable, pay-per-execution tools for the agent
-- **How it's used**:
-  - **GetOrderStatus**: Queries order database, returns status/tracking
-  - **CreateTicket**: Creates support ticket in ticketing system
-  - **Authentication**: API key validation via function keys
-  - **Logging**: Each call logged to Application Insights
-- **Hosting Plan**: Consumption (Y1) - only pay when called
-- **Cost**: ~$0.000001 per execution (nearly free for low volume)
+**Purpose:** Provides the agent's reasoning and tool selection capabilities
 
-### 3. **Application Insights** (`appi-smart-agents-*`)
-- **Purpose**: End-to-end observability for agent + tool calls
-- **Why**: Debug failures, track latency, monitor token usage
-- **What's tracked**:
-  - Agent decision: Which tool was selected and why
-  - Tool execution: Duration, success/failure, response size
-  - Error traces: Full stack traces for failed calls
-  - Custom metrics: Token count, confidence scores
-- **Correlation**: Single correlation ID spans entire agent workflow
+**Model:** `gpt-4o-mini` with function calling support
 
-### 4. **Key Vault** (`kv-agents-*`)
-- **Purpose**: Secure storage for API keys and secrets
-- **Why**: Never hardcode credentials in function code
-- **How it's used**:
-  - Stores Azure OpenAI API key
-  - Stores function app keys
-  - Function code reads secrets via Key Vault references
-  - Managed Identity for passwordless access
+**How Function Calling Works:**
 
-## Overview
+1. **Tool Definition:** Developer defines available functions with JSON schema
+2. **User Query:** "Where is my order 12345?"
+3. **Model Reasoning:** Analyzes query, decides to call `GetOrderStatus(orderId="12345")`
+4. **Function Execution:** Code executes the selected function
+5. **Result Synthesis:** Model receives function result, generates natural language response
 
-- **Agent**: TypeScript client using Azure OpenAI Chat Completions with function calling
-- **Tools**: Azure Functions exposing `GetOrderStatus` and `CreateTicket`
-- **Flow**: User query → Model decides tool usage → Execute function → Model synthesizes final answer
-
-## Architecture
-
+**Example Flow:**
 ```
-User Query: "Where is my order 12345?"
-    ↓
-┌──────────────────────────────────────────────┐
-│ Azure OpenAI (gpt-4o-mini)                   │
-│ Analyzes query, sees "order" + number        │
-│ Decision: Call GetOrderStatus(orderId=12345) │
-└──────────────┬───────────────────────────────┘
-               │ Function call request
-               ▼
-┌──────────────────────────────────────────────┐
-│ Azure Function: GetOrderStatus               │
-│ GET /api/GetOrderStatus?orderId=12345        │
-│ → Queries order DB                           │
-│ → Returns: {status: "shipped", tracking: ...}│
-└──────────────┬───────────────────────────────┘
-               │ Function result
-               ▼
-┌──────────────────────────────────────────────┐
-│ Azure OpenAI (gpt-4o-mini)                   │
-│ Synthesizes natural language response        │
-│ "Your order is shipped! Tracking: UPS12345"  │
-└──────────────────────────────────────────────┘
-    ↓
-User Response (with Application Insights tracking entire flow)
+User: "Where is order 12345?"
+  ↓
+Model decides: Call GetOrderStatus(orderId="12345")
+  ↓
+Function returns: {status: "shipped", tracking: "UPS12345", eta: "Nov 16"}
+  ↓
+Model responds: "Your order is shipped! Tracking number is UPS12345, expected delivery Nov 16."
 ```
 
-## Part 1: Azure Functions (Tools)
-
-### Setup
-
-```powershell
-cd function-tool
-npm install
-
-# Copy local settings
-cp local.settings.json.example local.settings.json
-```
-
-### Configure `local.settings.json`
-
+**Function Schema Example:**
 ```json
 {
-  "IsEncrypted": false,
-  "Values": {
+  "name": "GetOrderStatus",
+  "description": "Retrieves order status and tracking information",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "orderId": {
+        "type": "string",
+        "description": "The order ID to look up"
+      }
+    },
+    "required": ["orderId"]
+  }
+}
+```
+
+**Cost:** ~$0.0003 per query (includes tool selection + final answer generation)
+
+**Why GPT-4o-mini:**
+- Native function calling support (no prompt hacks needed)
+- Fast decision-making (<1s to choose tool)
+- Cost-effective for high-volume agent workloads
+
+### Azure Functions (`func-agents-*`)
+
+**Purpose:** Serverless HTTP endpoints that execute business logic tools
+
+**Hosting Plan:** Consumption (Y1) - Pay only when functions are called
+
+**Why Azure Functions for Tools:**
+- **Scalability:** Auto-scales from 0 to thousands of instances
+- **Pay-per-use:** Only charged for actual executions (~$0.000001/call)
+- **Managed infrastructure:** No servers to maintain
+- **Built-in auth:** Function keys for API security
+
+**Deployed Functions:**
+
+**1. GetOrderStatus**
+- **Method:** GET
+- **URL:** `/api/GetOrderStatus?orderId={id}`
+- **Purpose:** Queries order database, returns status and tracking
+- **Response:**
+  ```json
+  {
+    "orderId": "12345",
+    "status": "shipped",
+    "tracking": "UPS12345",
+    "estimatedDelivery": "2025-11-16"
+  }
+  ```
+
+**2. CreateTicket**
+- **Method:** POST
+- **URL:** `/api/CreateTicket`
+- **Purpose:** Creates support ticket in ticketing system
+- **Request Body:**
+  ```json
+  {
+    "title": "VPN not connecting",
+    "description": "Can't connect to VPN from home",
+    "priority": "high"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "ticketId": "TKT-20251115-ABC123",
+    "status": "created"
+  }
+  ```
+
+**Authentication:**
+- Function key validation via `x-functions-key` header
+- Keys managed securely in Key Vault
+- Prevents unauthorized tool execution
+
+**Logging:**
+- Each function call logged to Application Insights
+- Includes correlation ID linking agent request → tool execution → final response
+
+**Cost Per Execution:**
+- First 1 million executions: Free
+- After that: $0.20 per million executions
+- 1,000 tool calls/day = essentially free
+
+### Application Insights (`appi-smart-agents-*`)
+
+**Purpose:** End-to-end observability for agent + tool workflows
+
+**What Gets Tracked:**
+
+**1. Agent Decisions**
+- Which tool was selected and why (model reasoning)
+- Time spent deciding which tool to use
+- Token count for tool selection
+
+**2. Tool Execution**
+- Function start time and duration
+- Success/failure status
+- Response size and payload
+- Exception stack traces (if failure)
+
+**3. End-to-End Traces**
+- Single correlation ID spans: User query → Model decision → Function call → Final response
+- Visualize complete workflow in Application Map
+
+**4. Custom Metrics**
+- Token usage per query
+- Tool selection accuracy
+- Confidence scores (if applicable)
+
+**KQL Queries for Monitoring:**
+```kusto
+// Tool usage distribution
+customEvents
+| where name == "FunctionCalled"
+| summarize count() by tostring(customDimensions.toolName)
+
+// Average latency per tool
+requests
+| where operation_Name startswith "GET Order" or operation_Name startswith "POST CreateTicket"
+| summarize avg(duration) by operation_Name
+```
+
+**Value in Production:**
+- Debug why agent chose wrong tool
+- Track tool execution failures
+- Optimize slow function implementations
+- Monitor cost (tokens + function executions)
+
+### Key Vault (`kv-agents-*`)
+
+**Purpose:** Secure storage for API keys and secrets
+
+**Secrets Stored:**
+- Azure OpenAI API key
+- Function app host keys
+- Third-party API credentials (if tools call external services)
+
+**How It's Used:**
+- Function code reads secrets via Key Vault references: `@Microsoft.KeyVault(SecretUri=...)`
+- Managed Identity for passwordless access (no hardcoded credentials)
+- Automatic secret rotation support
+
+**Example in Function Code:**
+```typescript
+// NO hardcoded secrets!
+const apiKey = process.env.EXTERNAL_API_KEY; // Pulled from Key Vault
+```
+
+## Agent Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ User Query: "Where is my order 12345?"                   │
+└───────────────────┬──────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────────────────────┐
+│ Azure OpenAI (gpt-4o-mini)                               │
+│                                                           │
+│ 1. Analyzes query                                        │
+│ 2. Available tools: GetOrderStatus, CreateTicket         │
+│ 3. Decision: Query mentions "order" + number             │
+│ 4. Selected tool: GetOrderStatus(orderId="12345")        │
+└───────────────────┬──────────────────────────────────────┘
+                    ↓ Function call request
+┌──────────────────────────────────────────────────────────┐
+│ Azure Function: GetOrderStatus                           │
+│                                                           │
+│ GET /api/GetOrderStatus?orderId=12345                    │
+│   → Queries order database                               │
+│   → Returns: {status: "shipped", tracking: "UPS12345"}   │
+└───────────────────┬──────────────────────────────────────┘
+                    ↓ Function result
+┌──────────────────────────────────────────────────────────┐
+│ Azure OpenAI (gpt-4o-mini)                               │
+│                                                           │
+│ Receives function result, synthesizes natural response:  │
+│ "Your order is shipped! Tracking: UPS12345"              │
+└──────────────────────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────────────────────┐
+│ Application Insights                                     │
+│ Correlation ID tracks entire flow with telemetry         │
+└──────────────────────────────────────────────────────────┘
+```
+
+## When to Use Agents vs Traditional Code
+
+**Use Agents (Function Calling) When:**
+- User intent varies (model determines which tool to use)
+- Multiple tools available, selection depends on context
+- Natural language input needs interpretation
+- Business logic is simple (tools are lightweight)
+
+**Use Traditional Code When:**
+- Intent is deterministic (always same workflow)
+- Only one tool/action needed
+- Ultra-low latency required (<50ms)
+- Cost sensitivity (every millisecond counts)
+
+## Example: IT Support Agent
+
+**Without Function Calling (Traditional):**
+```typescript
+if (ticketText.includes("password")) {
+  return callPasswordResetTool();
+} else if (ticketText.includes("vpn")) {
+  return callVpnTroubleshootingTool();
+}
+// Doesn't scale to 50+ tools!
+```
+
+**With Function Calling (Agent):**
+```typescript
+// Define 50+ tools once
+const tools = [
+  { name: "ResetPassword", description: "..." },
+  { name: "CheckVPN", description: "..." },
+  // ... 48 more
+];
+
+// Model decides which tool to use
+const result = await agent.call(userQuery, tools);
+```
+
+The model intelligently selects the right tool based on context, even with complex queries like:
+- "My VPN won't connect AND I forgot my password" → Calls both tools
+- "How do I configure VPN?" → Calls documentation tool, not connection troubleshooting
+
+## Cost Comparison
+
+**Traditional Keyword Matching:**
+- Code execution only (essentially free)
+- 1,000 requests/day = $0/month
+
+**Agent with Function Calling:**
+- Tool selection: ~$0.0002 per decision
+- Function execution: ~$0.000001 per call
+- 1,000 requests/day = ~$6/month
+
+**Value:** Worth the cost if it replaces manual effort or enables new capabilities (multi-tool orchestration, natural language understanding).
+
+## Next Steps
+
+To extend this agent:
+
+1. **Add More Tools:** Create new function endpoints in `function-tool/src/`
+2. **Refine Tool Descriptions:** Better descriptions = better selection accuracy
+3. **Add Tool Validation:** Validate function outputs before returning to model
+4. **Implement Retry Logic:** Handle transient failures in tool execution
+
+See main [README.md](../../README.md) for deployment instructions.
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "<from .env>",

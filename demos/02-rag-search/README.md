@@ -1,103 +1,240 @@
-# Demo 02: RAG with Azure AI Search
+# Demo 02: RAG Search with Azure AI Search
 
-This demo shows **Retrieval Augmented Generation (RAG)** using Azure AI Search for knowledge grounding and Azure OpenAI for answer generation with source citations.
+This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for semantic knowledge retrieval and Azure OpenAI for answer generation with citations.
+
+## What This Demo Shows
+
+- **Vector embeddings** for semantic search
+- **Hybrid search** combining keywords + vectors + semantic ranking
+- **Grounded answers** that cite source documents
+- **Confidence scoring** based on retrieval relevance
 
 ## Azure Resources Used
 
-### 1. **Azure AI Search** (`srch-agents-*`)
-- **Purpose**: Vector + semantic search engine for knowledge base
-- **Why**: Enables fast, accurate retrieval of relevant documentation
-- **How it's used**:
-  - **Index Creation**: Stores documents with vector embeddings (3072 dimensions)
-  - **Hybrid Search**: Combines keyword search + vector similarity + semantic ranking
-  - **Retrieval**: Returns top 3-5 most relevant passages for each query
-- **Tier**: Standard S1 (~$250/month for production)
-- **Features Used**:
-  - HNSW vector search algorithm (cosine similarity)
-  - Semantic search with Azure ML re-ranker
-  - Facets and filters for metadata
+### Azure AI Search (`srch-agents-*`)
 
-### 2. **Azure OpenAI Service** (`oai-agents-*`)
+**Purpose:** Vector + semantic search engine for knowledge base
 
-#### Embeddings Model: `text-embedding-3-large`
-- **Purpose**: Converts text to 3072-dimensional vectors for semantic search
-- **Why**: Enables similarity matching beyond keyword search
-- **How it's used**:
-  - **Ingestion**: Embeds each KB document chunk before upload to search
-  - **Query**: Embeds user question to find semantically similar content
-- **Cost**: ~$0.00013 per 1K tokens (very cheap)
+**Tier:** Standard S1 (~$250/month) - Required for semantic ranking
 
-#### Chat Model: `gpt-4o-mini`
-- **Purpose**: Generates natural language answers from retrieved context
-- **Why**: Synthesizes multiple sources into coherent, cited responses
-- **How it's used**:
-  - Receives user question + retrieved context passages
-  - Generates answer using ONLY the provided context
-  - Includes citations [1], [2], [3] to source documents
-- **Cost**: ~$0.0002 per query (context + answer generation)
+**Why Standard Tier:**
+- **Semantic ranking enabled:** Uses Azure ML re-ranker to score results 0-4
+- **Higher performance:** More replicas and partitions
+- **Production capacity:** 50M documents, 25 indexes
 
-### 3. **Storage Account** (`stagents*`)
-- **Purpose**: Stores original markdown knowledge base files
-- **Why**: Backup and version control for KB content
-- **How it's used** (optional):
-  - Upload markdown files to blob storage
-  - Trigger ingestion pipeline when files change
-  - Maintain audit trail of KB updates
+**Key Features Used:**
 
-### 4. **Application Insights** (Optional - for production)
-- **Purpose**: Monitor RAG pipeline performance and quality
-- **Why**: Track retrieval relevance and answer quality
-- **Metrics tracked**:
-  - Query latency (target: <5s P95)
-  - Retrieved document count per query
-  - Confidence scores
-  - User feedback (thumbs up/down)
+**1. Vector Search (HNSW Algorithm)**
+- Stores 3072-dimensional embeddings for each document
+- Finds semantically similar content using cosine similarity
+- Fast approximate nearest neighbor search
 
-## Overview
+**2. Hybrid Search**
+- Combines 3 signals:
+  - **BM25 keyword matching** (traditional search)
+  - **Vector similarity** (semantic understanding)
+  - **Semantic re-ranker** (ML model scores final results)
+- Returns top 3-5 most relevant passages
 
-Two-part process:
+**3. Semantic Ranking**
+- CRITICAL for Demo 04: Reranker scores (0-4) map to confidence (0.1-0.9)
+- Without semantic ranking: All results get same confidence
+- With semantic ranking: System knows which answers to trust
 
-1. **Ingest**: Load knowledge base articles into Azure AI Search with vector embeddings
-2. **RAG Flow**: Retrieve relevant docs and generate grounded answers with citations
-
-## How It Works
-
+**Index Schema:**
+```json
+{
+  "name": "kb-support",
+  "fields": [
+    { "name": "id", "type": "Edm.String", "key": true },
+    { "name": "content", "type": "Edm.String", "searchable": true },
+    { "name": "title", "type": "Edm.String", "searchable": true },
+    { "name": "contentVector", "type": "Collection(Edm.Single)", "dimensions": 3072 }
+  ]
+}
 ```
-┌──────────────────┐
-│ User Question    │  "How do I reset my password?"
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ Generate         │  Azure OpenAI: text-embedding-3-large
-│ Query Embedding  │  → [0.123, -0.456, ...] (3072 dims)
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ Hybrid Search    │  Azure AI Search:
-│ (Vector+Keyword) │  1. Vector similarity search
-│                  │  2. Keyword (BM25) search
-│                  │  3. Semantic re-ranking
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ Top 3 Documents  │  [1] Password Reset Guide
-│ with Scores      │  [2] Account Security FAQ
-│                  │  [3] Login Troubleshooting
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ Generate Answer  │  Azure OpenAI: gpt-4o-mini
-│ with Citations   │  Prompt: "Answer using ONLY context..."
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│ Response         │  "To reset your password:
-│                  │   1. Go to portal.../reset [1]
+
+### Azure OpenAI Service (`oai-agents-*`)
+
+Two models work together for RAG:
+
+**1. Embeddings Model: `text-embedding-3-large`**
+
+**Purpose:** Converts text into 3072-dimensional vectors
+
+**When It's Used:**
+- **Ingestion:** Embeds each KB document before uploading to search
+- **Query:** Embeds user question to find similar documents
+
+**Cost:** ~$0.00013 per 1K tokens (very cheap)
+
+**Example:**
+```
+Input:  "How do I reset my password?"
+Output: [0.023, -0.157, 0.089, ..., 0.234] (3072 numbers)
+```
+
+**2. Chat Model: `gpt-4o-mini`**
+
+**Purpose:** Generates natural language answers from retrieved context
+
+**How It's Used:**
+1. Receives user question
+2. Gets top 3-5 retrieved document passages as context
+3. Generates answer using ONLY the provided context (no hallucination)
+4. Includes citations [1], [2], [3] to source documents
+
+**System Prompt:**
+```
+You are a helpful assistant. Answer the question using ONLY the context provided.
+If the answer is not in the context, say "I don't have information about that."
+Include citations [1], [2] for each fact.
+```
+
+**Cost:** ~$0.0002 per query (context + answer generation)
+
+### Storage Account (`stagents*`)
+
+**Purpose:** Backup and version control for knowledge base markdown files
+
+**Optional Use:**
+- Upload `.md` files to blob storage
+- Trigger ingestion pipeline when files change
+- Maintain audit trail of KB updates
+- Enable rollback to previous versions
+
+### Application Insights (`appi-smart-agents-*`)
+
+**Purpose:** Monitor RAG pipeline quality and performance
+
+**Metrics Tracked:**
+- **Query latency:** Target <5s P95 (includes search + generation)
+- **Retrieved document count:** Usually 3-5 per query
+- **Confidence scores:** Track confidence distribution over time
+- **User feedback:** thumbs up/down on answers (if implemented)
+
+**Value in Production:**
+- Identify slow queries (optimize index or add caching)
+- Spot low-confidence patterns (add more KB content)
+- Track cost per query (tokens used)
+
+## RAG Pipeline Flow
+
+```mermaid
+flowchart TD
+    A[User Question: How do I reset my password?] --> B[1. Generate Query Embedding]
+    B --> B1[Azure OpenAI: text-embedding-3-large<br/>Output: 3072-dimensional vector]
+    B1 --> C[2. Hybrid Search<br/>Azure AI Search]
+    
+    C --> C1[BM25: password reset]
+    C --> C2[Vector: cosine similarity]
+    C --> C3[Semantic: ML re-ranker 0-4]
+    
+    C1 --> D[3. Top Results with Scores]
+    C2 --> D
+    C3 --> D
+    
+    D --> D1[1 Password Reset Guide score: 3.8]
+    D --> D2[2 Account Security FAQ score: 2.1]
+    D --> D3[3 Login Issues score: 1.5]
+    
+    D1 --> E[4. Generate Answer]
+    D2 --> E
+    D3 --> E
+    E --> E1[Azure OpenAI: gpt-4o-mini]
+│    Prompt:                                │
+│      Context: [1],[2],[3] passages        │
+│      Question: How do I reset password?   │
+│      Instructions: Cite sources           │
+└───────────────┬───────────────────────────┘
+                ↓
+    E1 --> F[5. Response with Citations]
+    F --> F1["To reset your password:<br/>1. Go to portal.example.com/reset<br/>2. Enter your email<br/>3. Check for reset link<br/><br/>Sources: Password Reset Guide<br/>Confidence: 0.85"]
+    
+    style A fill:#e1f5ff
+    style D1 fill:#d4edda
+    style D2 fill:#fff3cd
+    style D3 fill:#f8d7da
+    style F1 fill:#d1ecf1
+```
+
+## Confidence Calculation
+
+The RAG function maps semantic ranking scores to confidence:
+
+```python
+# From demos/02-rag-search/rag-function/function_app.py
+if max_score >= 3.5:
+    confidence = 0.9   # Very relevant
+elif max_score >= 3.0:
+    confidence = 0.8   # Highly relevant
+elif max_score >= 2.0:
+    confidence = 0.6   # Moderately relevant
+elif max_score >= 1.0:
+    confidence = 0.4   # Somewhat relevant
+else:
+    confidence = 0.2   # Barely relevant
+```
+
+**Why This Matters:**
+- Demo 04 auto-replies if confidence ≥ 0.7
+- Below 0.7, ticket escalates to human review
+- Without good confidence, every ticket would escalate
+
+## Knowledge Base Ingestion
+
+**Current KB Documents:**
+- `password-reset.md` - Password recovery procedures
+- `vpn-troubleshooting.md` - VPN connectivity issues
+- `billing-guide.md` - Billing and payment information
+
+**Ingestion Process:**
+1. Read markdown files from `content/` directory
+2. Split into chunks (if needed for large docs)
+3. Generate embeddings for each chunk
+4. Upload to Azure AI Search index with metadata
+
+**Run Ingestion:**
+```bash
+cd demos/02-rag-search
+pip install -r requirements.txt
+python ingest-kb.py
+```
+
+**Expected Output:**
+```
+Successfully indexed 3 documents to kb-support index
+```
+
+## Cost Breakdown
+
+**Per Query:**
+- Embedding generation: $0.00002
+- AI Search query: $0.00001 (included in tier)
+- Answer generation: $0.0002
+- **Total: ~$0.00023 per query**
+
+**Monthly Estimate (1000 queries/day):**
+- Query costs: $7/month
+- Azure AI Search Standard: $250/month
+- **Total: ~$257/month**
+
+## Performance Targets
+
+- **Latency:** P95 <5 seconds (embedding + search + generation)
+- **Relevance:** Top result should answer query 90%+ of time
+- **Confidence:** Average confidence ≥0.7 for indexed topics
+
+## Next Steps
+
+To improve RAG quality:
+
+1. **Add More Documents:** Expand `content/` directory with your KB
+2. **Tune Chunking:** Adjust chunk size for optimal retrieval (currently full docs)
+3. **Monitor Confidence:** Use Application Insights to find low-confidence queries
+4. **Refine Prompts:** Update answer generation prompt in RAG function
+
+See main [README.md](../../README.md) for deployment instructions.
 │                  │   2. Click 'Forgot Password' [1]
 │                  │   3. Check email (5 min) [2]"
 └──────────────────┘

@@ -1,101 +1,129 @@
-# Demo 01: Ticket Triage with Prompt Flow
+# Demo 01: Ticket Triage with Azure OpenAI
 
-This demo shows how to use **Azure OpenAI** to classify incoming support tickets by category and priority using a prompt flow orchestration pattern.
+This demo shows how Azure OpenAI classifies support tickets by category and priority using prompt engineering.
+
+## What This Demo Shows
+
+- **Prompt engineering** for structured JSON output
+- **Few-shot learning** to guide classification
+- **Azure OpenAI** integration with keyword-based fallback
 
 ## Azure Resources Used
 
-### 1. **Azure OpenAI Service** (`oai-agents-*`)
-- **Purpose**: Runs the GPT-4o-mini model for intelligent ticket classification
-- **Why**: Provides the LLM capability to understand ticket text and classify it
-- **How it's used**:
-  - Receives ticket text as user prompt
-  - Applies system prompt with classification rules
-  - Returns structured JSON: `{"category": "...", "priority": "..."}`
-- **Model**: `gpt-4o-mini` (2024-07-18) - Fast, cost-effective for classification
-- **Cost**: ~$0.0001 per ticket (150 tokens input + 50 tokens output)
+### Azure OpenAI Service (`oai-agents-*`)
 
-### 2. **Application Insights** (Optional - for production)
-- **Purpose**: Tracks prompt flow execution metrics
-- **Why**: Monitor latency, token usage, classification accuracy
-- **How it's used**:
-  - Logs each classification request with correlation ID
-  - Tracks P50/P95 latency (target: <2 seconds)
-  - Monitors error rates and retries
+**Purpose:** Runs the GPT-4o-mini model to classify support tickets intelligently
 
-## Overview
+**Model Deployed:** `gpt-4o-mini` (2024-07-18)
 
-- **Input:** Support ticket text (string)
-- **Output:** JSON with `category` and `priority`
-- **Categories:** Billing, Technical, Account, Access
-- **Priorities:** High, Medium, Low
-- **Latency:** <2 seconds (P95)
+**Why This Model:**
+- Fast response times (<2 seconds P95)
+- Cost-effective for classification tasks (~$0.0001 per ticket)
+- Native JSON mode for structured outputs
+- Good at understanding context with few examples
 
-## How It Works
+**How It's Used:**
+1. Receives ticket text as user prompt
+2. Applies system prompt with classification rules
+3. Returns structured JSON: `{"category": "...", "priority": "..."}`
 
-```
-┌─────────────────┐
-│ Ticket Text     │  "VPN disconnects every 5 minutes"
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ System Prompt   │  "You are a ticket classification system..."
-│ (system.jinja2) │  Rules: Categories, Priority criteria
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Azure OpenAI    │  Model: gpt-4o-mini
-│ GPT-4o-mini     │  Endpoint: oai-agents-*.openai.azure.com
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ JSON Response   │  {"category": "Technical", "priority": "Medium"}
-└─────────────────┘
-```
+**Categories Supported:**
+- Billing
+- Technical
+- Account
+- Access
 
-## Prerequisites
+**Priorities Assigned:**
+- High (urgent issues, service outages)
+- Medium (standard requests)
+- Low (informational queries)
 
-```powershell
-# Install dependencies
-pip install -r requirements.txt
+### Application Insights (Optional for Production)
 
-# Or use the test scripts directly
-python ../../test-demo01.py
-python ../../test-multiple-tickets.py
+**Purpose:** Monitor classification accuracy and performance
+
+**Metrics Tracked:**
+- Latency per classification (target: P95 <2s)
+- Token usage per request
+- Category distribution (spot trends)
+- Error rates and retries
+
+**Value:** In production, helps identify when classification accuracy degrades or new ticket types emerge that need updated prompts.
+
+## Implementation Approaches
+
+### Current: Keyword-Based Triage
+
+The production system (Demo 04) uses keyword matching for 100% deterministic results:
+
+```typescript
+// From demos/04-real-ticket-creation/function/src/services/AIService.ts
+if (text.includes('password') || text.includes('login')) 
+  return 'Access';
+if (text.includes('vpn') || text.includes('network'))
+  return 'Network';
 ```
 
-Configure environment variables in `.env`:
+**Pros:** Fast, predictable, no AI costs
+**Cons:** Limited to known keywords, doesn't understand context
 
-```env
-AZURE_OPENAI_ENDPOINT=https://oai-agents-*.openai.azure.com/
-AZURE_OPENAI_API_KEY=<from deployment outputs>
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
-AZURE_OPENAI_API_VERSION=2024-08-01-preview
-```
+### Alternative: Prompt Flow (This Demo)
 
-## Create Azure OpenAI Connection
-
-```bash
-pf connection create --file connection.yaml --name azure_openai_connection
-```
-
-Or create `connection.yaml`:
+This demo shows the Prompt Flow approach for AI-based classification:
 
 ```yaml
-$schema: https://azuremlschemas.azureedge.net/promptflow/latest/AzureOpenAIConnection.schema.json
-name: azure_openai_connection
-type: azure_open_ai
-api_key: ${env:AZURE_OPENAI_API_KEY}
-api_base: ${env:AZURE_OPENAI_ENDPOINT}
-api_type: azure
-api_version: ${env:AZURE_OPENAI_API_VERSION}
+# flow.dag.yaml
+inputs:
+  ticket_text: string
+outputs:
+  category: string
+  priority: string
+nodes:
+  - name: classify
+    type: llm
+    source: prompts/classify.jinja2
 ```
 
-## Run Tests
+**Pros:** Understands context, handles variations, learns from examples
+**Cons:** Higher latency (~1-2s), costs per request, requires prompt tuning
 
-### Option 1: Direct Python Script (Recommended)
+## When to Use Each Approach
+
+**Use Keyword-Based When:**
+- Categories are well-defined with clear signals
+- Speed and cost are critical (high volume)
+- Accuracy requirements are met by keywords
+
+**Use AI-Based When:**
+- Ticket language varies significantly
+- Context matters (e.g., "down" in different contexts)
+- New categories emerge frequently
+
+## Cost Comparison
+
+**Keyword-Based:**
+- $0 per ticket (compute only)
+- 1,000 tickets/day = $0/month
+
+**AI-Based (GPT-4o-mini):**
+- ~$0.0001 per ticket (150 input + 50 output tokens)
+- 1,000 tickets/day = ~$3/month
+
+## Accuracy Expectations
+
+**Keyword-Based:** 95-100% on known patterns
+**AI-Based:** 85-95% (depends on prompt quality and training examples)
+
+## Next Steps
+
+To implement this demo in production:
+
+1. Replace keyword logic in `AIService.ts` with OpenAI call
+2. Add system prompt from `prompts/system.jinja2`
+3. Monitor accuracy in Application Insights
+4. Iterate on prompt based on misclassifications
+
+See main [README.md](../../README.md) for deployment instructions.
 
 ```powershell
 # Single ticket test

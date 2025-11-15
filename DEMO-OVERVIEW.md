@@ -219,7 +219,7 @@ Demonstrate **event-driven production system** for automated email support using
 ✅ **PRODUCTION READY** - Fully tested and documented
 - **Test Date**: November 14, 2025
 - **Webhook**: Active subscription (expires Nov 17, 2025)
-- **Monitored Inbox**: `AdeleV@hscluise.onmicrosoft.com`
+- **Monitored Inbox**: `YOUR_SUPPORT_EMAIL@yourdomain.com`
 
 ### Test Results
 
@@ -247,7 +247,7 @@ Demonstrate **event-driven production system** for automated email support using
 ```
 
 #### Manual Tests Required 📧
-- Send real email to `AdeleV@hscluise.onmicrosoft.com` to test:
+- Send real email to `YOUR_SUPPORT_EMAIL@yourdomain.com` to test:
   - Webhook notification (instant processing)
   - Auto-reply vs escalation based on confidence
   - Deduplication (send same email twice)
@@ -324,8 +324,8 @@ graph TB
 
 1. **Demo 01** - Start with simple triage classification
 2. **Demo 02** - Add knowledge base search (RAG)
-3. **Demo 04** - Combine everything in production system
-4. **Demo 03** - Extend with function calling (advanced)
+3. **Demo 03** - Add function calling for actions
+4. **Demo 04** - Combine everything in production system
 
 ### Skill Progression
 
@@ -343,7 +343,7 @@ graph TB
 | Demo 01: Triage | ✅ Functional | 100% category, 80% priority | ✅ Complete |
 | Demo 02: RAG | ✅ Functional | **100% pass rate** | ✅ Complete |
 | Demo 03: Agents | ✅ Functional | 100% tool selection | ✅ Complete |
-| **Demo 04: Production** | ✅ **Production** | **Fully tested** | ✅ **Complete** |
+| Demo 04: Production | ✅ **Production** | **Fully tested** | ✅ Complete |
 
 ---
 

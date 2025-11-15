@@ -1,6 +1,6 @@
 # Additional Test Email Scenarios
 
-Send these emails to **AdeleV@hscluise.onmicrosoft.com** to test the support agent.
+Send these emails to **YOUR_SUPPORT_EMAIL@yourdomain.com** to test the support agent.
 
 ## Scenario 9: Software License Expiry (Software/High)
 

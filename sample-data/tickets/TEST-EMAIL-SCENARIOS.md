@@ -1,6 +1,6 @@
 # Test Email Scenarios for Smart Support Agent
 
-Send these emails to **AdeleV@hscluise.onmicrosoft.com** to test the webhook-based email processing system.
+Send these emails to **YOUR_SUPPORT_EMAIL@yourdomain.com** to test the webhook-based email processing system.
 
 ## Core Test Scenarios (Original 3)
 
@@ -86,7 +86,7 @@ Accounts Payable
 ## How to Test
 
 ### Method 1: Real Email (RECOMMENDED)
-Just send an email to `AdeleV@hscluise.onmicrosoft.com` with any of the subjects and bodies above. The webhook will process it **instantly** and you'll receive an auto-reply or manual review notification.
+Just send an email to `YOUR_SUPPORT_EMAIL@yourdomain.com` with any of the subjects and bodies above. The webhook will process it **instantly** and you'll receive an auto-reply or manual review notification.
 
 ### Method 2: Manual Trigger
 If the webhook isn't working, manually trigger processing:
@@ -132,7 +132,7 @@ az monitor app-insights query \
 ## Expected System Behavior
 
 1. **Email arrives** → Webhook triggered within seconds
-2. **Self-email filter** → Skips if from `AdeleV@hscluise.onmicrosoft.com`
+2. **Self-email filter** → Skips if from `YOUR_SUPPORT_EMAIL@yourdomain.com`
 3. **Duplicate check** → Skips if EmailMessageId already processed
 4. **Triage** → Keyword-based classification (Category + Priority)
 5. **RAG search** → Knowledge base query with score-based confidence
