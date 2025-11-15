@@ -8,10 +8,10 @@ This project showcases **4 progressive demonstrations** of building intelligent 
 
 | Demo | What It Shows | Deployment Status | Key Technologies |
 |------|---------------|-------------------|------------------|
-| **[Demo 01: Triage](demos/01-triage-promptflow/)** | Classify support tickets by category and priority | 📚 **Reference** (logic used in Demo 04) | Azure OpenAI (GPT-4o-mini), Prompt engineering |
-| **[Demo 02: RAG Search](demos/02-rag-search/)** | Answer questions using knowledge base retrieval | ✅ **Deployed** (Python Function) | Azure AI Search (vector + semantic), Embeddings |
-| **[Demo 03: Agent Tools](demos/03-agent-with-tools/)** | Execute actions via function calling | 📚 **Reference** (pattern used in Demo 04) | Azure Functions, OpenAI function calling |
-| **[Demo 04: Production System](demos/04-real-ticket-creation/)** | End-to-end event-driven email processing | ✅ **Deployed** (Node.js Function) | Microsoft Graph webhooks, Table Storage |
+| **[Demo 01: Triage](demos/01-triage-promptflow/)** | Classify support tickets by category and priority | **Reference** (logic used in Demo 04) | Azure OpenAI (GPT-4o-mini), Prompt engineering |
+| **[Demo 02: RAG Search](demos/02-rag-search/)** | Answer questions using knowledge base retrieval | **Deployed** (Python Function) | Azure AI Search (vector + semantic), Embeddings |
+| **[Demo 03: Agent Tools](demos/03-agent-with-tools/)** | Execute actions via function calling | **Reference** (pattern used in Demo 04) | Azure Functions, OpenAI function calling |
+| **[Demo 04: Production System](demos/04-real-ticket-creation/)** | End-to-end event-driven email processing | **Deployed** (Node.js Function) | Microsoft Graph webhooks, Table Storage |
 
 **Architecture Overview:**
 ```
@@ -19,9 +19,34 @@ Email arrives → Graph webhook → Triage (Demo 01 logic) → RAG search (Demo 
   Create ticket (Demo 03 pattern) → Auto-reply or escalate (Demo 04)
 ```
 
-**What Gets Deployed:**
-- ✅ **2 Azure Functions:** Demo 02 RAG function (Python) + Demo 04 email processor (Node.js)
-- 📚 **Demos 01 & 03:** Educational references showing concepts integrated into Demo 04
+**How It Works:**
+
+```mermaid
+graph LR
+    A[Email Arrives] --> B[Graph Webhook]
+    B --> C{Triage<br/>Demo 01 Logic}
+    C --> D[RAG Search<br/>Demo 02 Function]
+    D --> E{Confidence<br/>Score}
+    E -->|High ≥0.7| F[Auto-Reply<br/>to Customer]
+    E -->|Low <0.7| G[Escalate to<br/>Support Team]
+    F --> H[Create Ticket<br/>Demo 03 Pattern]
+    G --> H
+    
+    style A fill:#0078d4,color:#fff
+    style C fill:#ffb900,color:#000
+    style D fill:#0078d4,color:#fff
+    style E fill:#50e6ff,color:#000
+    style F fill:#107c10,color:#fff
+    style G fill:#d13438,color:#fff
+```
+
+**What Gets Deployed to Azure:**
+- **func-agents-*** (Node.js 20): Email processing with keyword triage + ticket creation
+- **func-rag-*** (Python 3.11): RAG search with confidence scoring
+
+**What's Reference-Only:**
+- **Demo 01:** Shows Prompt Flow structure (logic implemented as keyword matching in Demo 04)
+- **Demo 03:** Shows function calling pattern (used for ticket creation in Demo 04)
 
 Each demo builds on the previous, culminating in a production-ready system that auto-resolves 60-80% of support tickets.
 
@@ -174,47 +199,59 @@ Invoke-RestMethod -Uri "https://func-agents-<random>.azurewebsites.net/api/pings
 
 ### Step 5: Configure Microsoft Graph Webhook (Demo 04 Only)
 
-**Manual Steps Required:**
+**Automated Setup** (Recommended):
+
+```powershell
+# Run the setup script (requires Global Administrator privileges)
+.\scripts\setup-graph-webhook.ps1 -SupportEmail "support@yourdomain.com"
+```
+
+**What the script does:**
+- Creates app registration "SmartSupportAgent"
+- Adds Microsoft Graph API permissions (Mail.Read, Mail.Send, User.Read.All)
+- Grants admin consent
+- Creates client secret
+- Updates function app settings
+- Creates webhook subscription
+
+**Manual Alternative:**
+
+<details>
+<summary>Click to expand manual setup steps</summary>
 
 1. **Create App Registration:**
    - Go to Azure Portal → Entra ID → App registrations → New registration
    - Name: `SmartSupportAgent`
    - Supported account types: Single tenant
-   - No redirect URI needed
 
 2. **Add API Permissions:**
    - Microsoft Graph → Application permissions:
-     - `Mail.Read` - Read mail in all mailboxes
-     - `Mail.Send` - Send mail as any user
-     - `User.Read.All` - Read all users' basic profiles
+     - `Mail.Read`, `Mail.Send`, `User.Read.All`
    - Click **Grant admin consent**
 
 3. **Create Client Secret:**
    - Certificates & secrets → New client secret
-   - Copy the secret value (you won't see it again!)
 
-4. **Update Function App Settings:**
+4. **Update Function App:**
    ```powershell
    az webapp config appsettings set `
      --name func-agents-<random> `
      --resource-group rg-smart-agents-dev `
      --settings `
-       GRAPH_CLIENT_ID="<app-registration-id>" `
-       GRAPH_CLIENT_SECRET="<client-secret>" `
-       GRAPH_TENANT_ID="<your-tenant-id>" `
-       SUPPORT_EMAIL="your-support@yourdomain.com"
+       GRAPH_CLIENT_ID="<app-id>" `
+       GRAPH_CLIENT_SECRET="<secret>" `
+       GRAPH_TENANT_ID="<tenant-id>" `
+       SUPPORT_EMAIL_ADDRESS="support@yourdomain.com"
    ```
 
-5. **Create Webhook Subscription:**
+5. **Create Webhook:**
    ```powershell
-   $functionKey = az functionapp keys list --name func-agents-<random> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
-   
-   Invoke-RestMethod -Uri "https://func-agents-<random>.azurewebsites.net/api/managesubscription" `
-     -Method Post `
-     -Headers @{ "x-functions-key" = $functionKey }
+   $key = az functionapp keys list --name func-agents-<random> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+   Invoke-RestMethod -Uri "https://func-agents-<random>.azurewebsites.net/api/managesubscription" -Method Post -Headers @{ "x-functions-key" = $key }
    ```
+</details>
 
-**Note:** Webhook subscriptions expire after 3 days and must be renewed. See [docs/WEBHOOK-MANAGEMENT.md](docs/WEBHOOK-MANAGEMENT.md) for renewal instructions.
+**⚠️ Important:** Webhook subscriptions expire after 3 days. Renew with the same script or see [docs/WEBHOOK-MANAGEMENT.md](docs/WEBHOOK-MANAGEMENT.md).
 
 ### Step 6: Test Each Demo
 
@@ -256,74 +293,75 @@ Navigate to individual demo READMEs for detailed resource explanations:
 - [Demo 03: Agent with Tools](demos/03-agent-with-tools/README.md)
 - [Demo 04: Production Email System](demos/04-real-ticket-creation/function/README.md)
 
-## What You Need to Do Manually
+## Post-Deployment Configuration
 
-The Bicep deployment automates most infrastructure setup, but these steps require manual configuration:
+Most setup is automated via Bicep, but a few steps need your input:
 
-### Required Manual Steps
+### Automated Setup (via scripts)
 
-1. **App Registration for Graph API (Demo 04 only):**
-   - Create app registration in Entra ID
-   - Add Mail.Read, Mail.Send, User.Read.All permissions
-   - Grant admin consent
-   - Create and copy client secret
-   - Update function app settings with credentials
+| Task | Script | What It Does |
+|------|--------|--------------|
+| **Graph API Setup** | `.\scripts\setup-graph-webhook.ps1` | Creates app registration, grants permissions, configures webhook |
+| **Knowledge Base Ingestion** | `python demos/02-rag-search/ingest-kb.py` | Uploads support docs to AI Search |
 
-2. **Webhook Subscription (Demo 04 only):**
-   - Call ManageSubscription endpoint to create subscription
-   - Renew every 3 days (Microsoft Graph limitation)
+### 🔧 Manual Configuration (if needed)
 
-3. **Knowledge Base Content (All demos):**
-   - Add your own markdown documentation to `demos/02-rag-search/content/`
-   - Run `ingest-kb.py` to index into Azure AI Search
+**For Demo 04 (Email Processing):**
+- If the automated script fails, use [Step 5 manual instructions](#step-5-configure-microsoft-graph-webhook-demo-04-only)
+- Renew webhook subscription every 3 days (limitation of Microsoft Graph API)
 
-4. **Environment Variables:**
-   - Create `.env` file with deployment outputs
-   - Get API keys from Azure Portal for OpenAI and AI Search
-   - Get function keys via Azure CLI
+**For Custom Knowledge Base:**
+- Add your markdown files to `demos/02-rag-search/content/`
+- Re-run `ingest-kb.py` to update AI Search index
 
-### Optional Manual Steps
+**For Local Development:**
+- Create `local.settings.json` files (see [Step 2](#step-2-configure-environment-variables))
+- Get API keys from Azure Portal if needed
 
-1. **Custom Email Domain:**
-   - Configure custom domain in Microsoft 365
-   - Update SUPPORT_EMAIL setting
+### 📊 Optional Enhancements
 
-2. **Monitoring Alerts:**
-   - Configure Application Insights alerts for errors
-   - Set up budget alerts for cost management
-
-3. **Knowledge Base Expansion:**
-   - Add more documents to improve coverage
-   - Test confidence scores and refine content
+- **Custom Email Domain:** Configure in Microsoft 365, update `SUPPORT_EMAIL_ADDRESS`
+- **Monitoring Alerts:** Set up Application Insights alerts for errors/budget
+- **Knowledge Base Expansion:** Add more documents to improve coverage
 
 ## Architecture Overview
 
+**Real Production Flow:**
+
 ```mermaid
-graph TD
-    subgraph "Demo 04: Production Email System"
-        A[Email Arrives] --> B[Graph Webhook]
-        B --> C[Triage - Demo 01]
-        C --> D[RAG Search - Demo 02]
-        D --> E[Create Ticket - Demo 03 Pattern]
-        E --> F{High Confidence?}
-        F -->|Yes| G[Auto-reply]
-        F -->|No| H[Escalate]
-    end
-
-    subgraph "Azure AI Foundry Resources"
-        I[Azure OpenAI<br/>GPT-4o-mini<br/>Embeddings]
-        J[AI Search<br/>Vector + Semantic]
-        K[Functions<br/>Node.js + Python]
-        L[Table Storage<br/>Tickets]
-        M[Key Vault<br/>Secrets]
-        N[App Insights<br/>Monitoring]
-    end
-
+graph LR
+    A[Email Arrives] --> B[Graph Webhook<br/>Triggers func-agents]
+    
+    B --> C[Demo 04 Function<br/>Node.js]
+    
+    C --> D[1. Keyword Triage<br/>Demo 01 logic]
+    D --> E[2. HTTP Call to<br/>func-rag Python]
+    
+    E --> F{3. Confidence<br/>Score ≥0.7?}
+    
+    F -->|High| G[Auto-Reply<br/>to Customer]
+    F -->|Low| H[Escalate to<br/>Support Team]
+    
+    G --> I[4. Create Ticket<br/>Demo 03 pattern<br/>Table Storage]
+    H --> I
+    
     style A fill:#0078d4,color:#fff
-    style F fill:#ffb900,color:#000
+    style C fill:#ffb900,color:#000
+    style E fill:#0078d4,color:#fff
+    style F fill:#50e6ff,color:#000
     style G fill:#107c10,color:#fff
     style H fill:#d13438,color:#fff
 ```
+
+**What Gets Deployed:**
+- **func-agents-*** (Node.js): Receives webhook → triages → calls RAG → creates ticket → replies
+- **func-rag-*** (Python): Receives HTTP request → searches knowledge base → returns answer + confidence
+
+**How Demos Map to Production:**
+- **Demo 01 logic** = Keyword matching inside func-agents
+- **Demo 02** = Deployed as func-rag (called by func-agents via HTTP)
+- **Demo 03 pattern** = Ticket creation code inside func-agents
+- **Demo 04** = The func-agents function that orchestrates everything
 
 ## Project Structure
 
@@ -346,25 +384,6 @@ espc25/
     └── DEPLOYMENT-ARCHITECTURE.md  # Detailed architecture
 ```
 
-## Troubleshooting
-
-### "Deployment failed: InvalidTemplateDeployment"
-- Check Azure subscription has required resource providers registered
-- Verify you have Owner or Contributor role on subscription
-
-### "Function app not responding"
-- Check function app logs: `az webapp log tail --name func-agents-<random> --resource-group rg-smart-agents-dev`
-- Verify environment variables are set in function app settings
-
-### "RAG search returns low confidence"
-- Verify knowledge base documents are indexed: Check AI Search portal
-- Add more relevant content to `demos/02-rag-search/content/`
-- Re-run `ingest-kb.py`
-
-### "Webhook not processing emails"
-- Check subscription status: GET `/api/managesubscription`
-- Verify app registration has admin consent for Graph API permissions
-- Check Application Insights logs for webhook errors
 
 ## Contributing
 
@@ -374,10 +393,6 @@ This is a demonstration project. To adapt for your use case:
 2. **Modify Triage Rules:** Update keyword matching in `demos/04-real-ticket-creation/function/src/services/AIService.ts`
 3. **Add Custom Functions:** Create new tool endpoints in `demos/03-agent-with-tools/function-tool/src/`
 4. **Adjust Confidence Threshold:** Modify auto-resolve threshold in `GraphWebhook.ts` (currently 0.7)
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details.
 
 ## Additional Resources
 

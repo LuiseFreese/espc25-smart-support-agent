@@ -122,8 +122,8 @@ Include citations [1], [2] for each fact.
 
 ```mermaid
 flowchart TD
-    A[User Question: How do I reset my password?] --> B[1. Generate Query Embedding]
-    B --> B1[Azure OpenAI: text-embedding-3-large<br/>Output: 3072-dimensional vector]
+    A[User Question:<br/>How do I reset my password?] --> B[1. Generate Query Embedding]
+    B --> B1[Azure OpenAI:<br/>text-embedding-3-large<br/>3072-dimensional vector]
     B1 --> C[2. Hybrid Search<br/>Azure AI Search]
     
     C --> C1[BM25: password reset]
@@ -134,21 +134,18 @@ flowchart TD
     C2 --> D
     C3 --> D
     
-    D --> D1[1 Password Reset Guide score: 3.8]
-    D --> D2[2 Account Security FAQ score: 2.1]
-    D --> D3[3 Login Issues score: 1.5]
+    D --> D1["Result 1: Password Reset Guide<br/>Score: 3.8"]
+    D --> D2["Result 2: Account Security FAQ<br/>Score: 2.1"]
+    D --> D3["Result 3: Login Issues<br/>Score: 1.5"]
     
-    D1 --> E[4. Generate Answer]
+    D1 --> E[4. Generate Answer<br/>Azure OpenAI: gpt-4o-mini]
     D2 --> E
     D3 --> E
-    E --> E1[Azure OpenAI: gpt-4o-mini]
-│    Prompt:                                │
-│      Context: [1],[2],[3] passages        │
-│      Question: How do I reset password?   │
-│      Instructions: Cite sources           │
-└───────────────┬───────────────────────────┘
-                ↓
+    
+    E --> E1["Prompt:<br/>Context: passages 1,2,3<br/>Question: How do I reset password?<br/>Instructions: Cite sources"]
+    
     E1 --> F[5. Response with Citations]
+    
     F --> F1["To reset your password:<br/>1. Go to portal.example.com/reset<br/>2. Enter your email<br/>3. Check for reset link<br/><br/>Sources: Password Reset Guide<br/>Confidence: 0.85"]
     
     style A fill:#e1f5ff
@@ -319,9 +316,9 @@ Expected output:
 - **Accuracy**: ~60% for internal questions
 
 **With RAG (Azure AI Search + GPT-4o-mini):**
-- ✅ Grounded in actual knowledge base
-- ✅ Source citations for verification
-- ✅ Always up-to-date with KB
+- Grounded in actual knowledge base
+- Source citations for verification
+- Always up-to-date with KB
 - **Accuracy**: ~95% for indexed content
 
 ## Cost Analysis
@@ -461,24 +458,24 @@ pf flow test -f flow.dag.yaml --inputs data/rag_eval.jsonl
 
 **Test Date**: November 14, 2025
 
-### ✅ RAG Function Deployment
+### RAG Function Deployment
 
 **Function**: `func-rag-dw7z4hg4ssn2k` (Sweden Central)
 - **Endpoint**: `https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search`
 - **Runtime**: Python 3.11
 - **Authentication**: Function key required (`x-functions-key` header)
 
-### ✅ Test Results
+### Test Results
 
 Tested with 5 different support scenarios:
 
 | Query | Confidence | Answer Length | Status |
 |-------|------------|---------------|---------|
-| How do I reset my password? | 0.80 | 509 chars | ✅ High |
-| VPN keeps disconnecting | 0.60 | 1212 chars | ✅ Pass |
-| I was charged twice on my bill | 0.80 | 959 chars | ✅ High |
-| Can't install Office 365 | 0.60 | 1009 chars | ✅ Pass |
-| How do I configure MFA? | 0.80 | 317 chars | ✅ High |
+| How do I reset my password? | 0.80 | 509 chars | High |
+| VPN keeps disconnecting | 0.60 | 1212 chars | Pass |
+| I was charged twice on my bill | 0.80 | 959 chars | High |
+| Can't install Office 365 | 0.60 | 1009 chars | Pass |
+| How do I configure MFA? | 0.80 | 317 chars | High |
 
 **Summary**:
 - **Total Tests**: 5
@@ -489,15 +486,15 @@ Tested with 5 different support scenarios:
 ### 🔍 Observations
 
 **What's Working**:
-- ✅ Score-based confidence calculation (0.1-0.9 range based on semantic ranking)
-- ✅ 100% pass rate after adding targeted KB document for duplicate billing scenarios
-- ✅ High-quality responses across all query types
-- ✅ Detailed answers with step-by-step instructions
-- ✅ Fast response times (<2 seconds per query)
+- Score-based confidence calculation (0.1-0.9 range based on semantic ranking)
+- 100% pass rate after adding targeted KB document for duplicate billing scenarios
+- High-quality responses across all query types
+- Detailed answers with step-by-step instructions
+- Fast response times (<2 seconds per query)
 
 **Knowledge Base Improvements**:
-- ✅ Added `duplicate-charges-guide.md` with specific "charged twice" terminology
-- ✅ Improved semantic matching for billing-related queries (0.4 → 0.8 confidence)
+- Added `duplicate-charges-guide.md` with specific "charged twice" terminology
+- Improved semantic matching for billing-related queries (0.4 → 0.8 confidence)
 
 **Known Limitations**:
 - ⚠️ Billing queries get lower confidence (0.4) - may need more billing documentation in KB
@@ -519,16 +516,16 @@ $env:RAG_KEY = "YOUR_RAG_FUNCTION_KEY_HERE"
 az functionapp keys list --name func-rag-dw7z4hg4ssn2k --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
 ```
 
-### ✅ Production Status
+### Production Status
 
 **Current State**: Demo 02 is **FULLY FUNCTIONAL**.
 
 **Verified Components**:
-- ✅ Azure AI Search index (`kb-support`) with 10 embedded documents
-- ✅ RAG function deployed and responding
-- ✅ Text embedding model (`text-embedding-3-large`) working
-- ✅ Chat model (`gpt-4o-mini`) generating answers
-- ✅ Semantic ranking returning relevant results
+- Azure AI Search index (`kb-support`) with 10 embedded documents
+- RAG function deployed and responding
+- Text embedding model (`text-embedding-3-large`) working
+- Chat model (`gpt-4o-mini`) generating answers
+- Semantic ranking returning relevant results
 
 **Integration**:
 - Used by Demo 04b for knowledge base search

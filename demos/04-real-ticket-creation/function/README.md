@@ -16,10 +16,7 @@ This demo integrates all previous demos into a complete, event-driven email proc
 flowchart TD
     A[Email Arrives] -->|Instant webhook notification| B[GraphWebhook Function<br/>Node.js]
     
-    B --> B1{Validate Request}
-    B1 --> B2{Self-email?}
-    B2 -->|No| B3{Duplicate?}
-    B3 -->|New| C[Triage:<br/>Keyword Classification]
+    B --> C[Triage:<br/>Keyword Classification]
     
     C --> C1["Category<br/>(Network/Access/Billing)"]
     C --> C2["Priority<br/>(High/Medium/Low)"]
@@ -38,14 +35,10 @@ flowchart TD
     
     G & H --> I[Log to<br/>App Insights]
     
-    B2 -->|Yes| Skip[Skip Processing]
-    B3 -->|Duplicate| Skip
-    
     style A fill:#0078d4,color:#fff
     style F fill:#ffb900,color:#000
     style G fill:#107c10,color:#fff
     style H fill:#d13438,color:#fff
-    style Skip fill:#666,color:#fff
 ```
 
 ## Production Components

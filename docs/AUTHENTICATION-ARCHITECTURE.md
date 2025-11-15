@@ -81,10 +81,10 @@ const client = new OpenAIClient(
 ```
 
 ### Benefits
-- ✅ **Secure**: No keys in config, code, or environment variables
-- ✅ **Auditable**: All access logged in Azure AD
-- ✅ **Zero maintenance**: No rotation, no expiration
-- ✅ **Principle of least privilege**: Only granted specific roles needed
+- **Secure**: No keys in config, code, or environment variables
+- **Auditable**: All access logged in Azure AD
+- **Zero maintenance**: No rotation, no expiration
+- **Principle of least privilege**: Only granted specific roles needed
 
 ## 2. Development: User Access (Optional)
 
@@ -209,7 +209,7 @@ Purpose: Debugging during development (convenience)
 ```
 
 **Best Practice:**
-- ✅ Always use Managed Identity for applications
-- ✅ Minimize human access to secrets
-- ✅ Remove user access before production deployment
-- ✅ Use Azure Portal UIs instead of direct secret access
+- Always use Managed Identity for applications
+- Minimize human access to secrets
+- Remove user access before production deployment
+- Use Azure Portal UIs instead of direct secret access

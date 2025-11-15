@@ -221,7 +221,7 @@ The evaluation flow compares predicted vs expected labels and computes accuracy.
 
 **Test Date**: November 14, 2025
 
-### ✅ Classification Testing
+### Classification Testing
 
 Tested LLM-based classification with 5 diverse support scenarios using Azure OpenAI (`gpt-4o-mini`).
 
@@ -242,23 +242,23 @@ Tested LLM-based classification with 5 diverse support scenarios using Azure Ope
 
 **Notes**:
 - ⚠️ Billing test: LLM classified as "High" priority instead of expected "Medium". This is actually reasonable since being charged twice could be urgent for some users. The classification rules may need refinement for edge cases.
-- ✅ All categories classified correctly (Technical, Account, Billing, Access)
-- ✅ System prompt effectively guides the model to structured JSON output
+- All categories classified correctly (Technical, Account, Billing, Access)
+- System prompt effectively guides the model to structured JSON output
 
 ### 🔍 Observations
 
 **What's Working**:
-- ✅ Structured JSON output with `response_format: json_object`
-- ✅ Zero temperature ensures deterministic results
-- ✅ Clear classification rules in system prompt
-- ✅ Fast response time (<1 second per classification)
-- ✅ Cost-effective: ~$0.0001 per ticket
+- Structured JSON output with `response_format: json_object`
+- Zero temperature ensures deterministic results
+- Clear classification rules in system prompt
+- Fast response time (<1 second per classification)
+- Cost-effective: ~$0.0001 per ticket
 
 **Prompt Flow Notes**:
 - ⚠️ Flow definition exists (`flow.dag.yaml`) but **not deployed to Azure AI Foundry**
-- ✅ Classification logic validated using direct Azure OpenAI SDK calls
-- ✅ Jinja2 templates updated (system prompt embedded in classify.jinja2)
-- 📝 To deploy: Use Azure AI Foundry portal or `az ml` CLI commands
+- Classification logic validated using direct Azure OpenAI SDK calls
+- Jinja2 templates updated (system prompt embedded in classify.jinja2)
+- To deploy: Use Azure AI Foundry portal or `az ml` CLI commands
 
 ### 📝 Test Command
 
@@ -271,22 +271,22 @@ python tests/test-demo01-triage.py
 #   --inputs ticket_text='VPN disconnects every 5 minutes'
 ```
 
-### ✅ Production Status
+### Production Status
 
 **Current State**: Demo 01 classification logic is **FULLY FUNCTIONAL** but **not deployed as Prompt Flow**.
 
 **Verified Components**:
-- ✅ Azure OpenAI model (`gpt-4o-mini`) working
-- ✅ System prompt with clear classification rules
-- ✅ JSON structured output
-- ✅ High classification accuracy (100% category, 80% priority)
+- Azure OpenAI model (`gpt-4o-mini`) working
+- System prompt with clear classification rules
+- JSON structured output
+- High classification accuracy (100% category, 80% priority)
 
 **Usage in Demo 04b**:
 - Demo 04b currently uses **keyword-based triage** (100% accuracy on specific test cases)
 - This LLM-based approach could replace keyword matching for better handling of edge cases
 - Trade-off: Higher cost (~$0.0001/ticket) vs better accuracy on ambiguous tickets
 
-### 🔄 Deployment to Prompt Flow (Optional)
+### Deployment to Prompt Flow (Optional)
 
 To deploy this as a Prompt Flow in Azure AI Foundry:
 
