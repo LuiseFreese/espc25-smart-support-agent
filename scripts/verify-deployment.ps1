@@ -107,15 +107,21 @@ $graphClientId = az functionapp config appsettings list --name $funcAgents --res
 if ($graphClientId) {
     try {
         $funcKey = az functionapp keys list --name $funcAgents --resource-group $ResourceGroup --query "functionKeys.default" -o tsv
-        $subscription = Invoke-RestMethod -Uri "https://$funcAgents.azurewebsites.net/api/managesubscription" -Method Get -Headers @{ 'x-functions-key' = $funcKey } -ErrorAction Stop
+        $result = Invoke-RestMethod -Uri "https://$funcAgents.azurewebsites.net/api/managesubscription" -Method Get -Headers @{ 'x-functions-key' = $funcKey } -ErrorAction Stop
         
-        $expirationDate = [datetime]::Parse($subscription.expirationDateTime)
-        $daysUntilExpiry = ($expirationDate - (Get-Date)).Days
-        
-        if ($daysUntilExpiry -gt 1) {
-            Write-Host "✓ Webhook subscription active (expires in $daysUntilExpiry days)" -ForegroundColor Green
+        if ($result.count -gt 0) {
+            $subscription = $result.subscriptions[0]
+            $expirationDate = [datetime]::Parse($subscription.expirationDateTime)
+            $daysUntilExpiry = ($expirationDate - (Get-Date)).Days
+            
+            if ($daysUntilExpiry -gt 1) {
+                Write-Host "✓ Webhook subscription active (expires in $daysUntilExpiry days)" -ForegroundColor Green
+            } else {
+                Write-Host "⚠️  Webhook expires soon ($daysUntilExpiry days) - renew with setup-graph-webhook.ps1" -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "⚠️  Webhook expires soon ($daysUntilExpiry days) - renew with setup-graph-webhook.ps1" -ForegroundColor Yellow
+            Write-Host "⚠️  No webhook subscriptions found" -ForegroundColor Yellow
+            Write-Host "   Run: .\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail <email>" -ForegroundColor Gray
         }
     } catch {
         Write-Host "⚠️  Webhook not configured or expired" -ForegroundColor Yellow

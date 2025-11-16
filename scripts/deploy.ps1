@@ -101,11 +101,15 @@ Push-Location $infraPath
 $deploymentName = "smart-agents-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 Write-Host "  Deployment name: $deploymentName" -ForegroundColor Gray
 
+# Get current user object ID for RBAC assignments
+$currentUserObjectId = az ad signed-in-user show --query "id" -o tsv
+
 Invoke-WithRetry -ScriptBlock {
     az deployment sub create `
         --location $Location `
         --template-file main.bicep `
-        --parameters @parameters.dev.json `
+        --parameters parameters.dev.json `
+        --parameters currentUserObjectId=$currentUserObjectId `
         --name $deploymentName `
         --output none
     
@@ -176,8 +180,12 @@ if ($commServicesName) {
     exit 1
 }
 
-# Ingest Knowledge Base
-Write-Host "`n[4/8] Ingesting knowledge base documents..." -ForegroundColor Yellow
+# Update .env file with new resource values
+Write-Host "`n  Updating .env file..." -ForegroundColor Gray
+
+$envFilePath = Join-Path $PSScriptRoot "..\.env"
+$tenantId = az account show --query "tenantId" -o tsv
+$subscriptionId = az account show --query "id" -o tsv
 
 # Get Azure AI Search and OpenAI details
 $searchName = az search service list --resource-group $ResourceGroup --query "[0].name" -o tsv
@@ -188,17 +196,56 @@ $openaiName = az cognitiveservices account list --resource-group $ResourceGroup 
 $openaiKey = az cognitiveservices account keys list --name $openaiName --resource-group $ResourceGroup --query "key1" -o tsv
 $openaiEndpoint = "https://$openaiName.openai.azure.com/"
 
+# Get function app names
+$funcRag = az functionapp list --resource-group $ResourceGroup --query "[?contains(name, 'func-rag')].name" -o tsv | Select-Object -First 1
+$funcAgents = az functionapp list --resource-group $ResourceGroup --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
+
+$envContent = @"
+# Azure Resources Configuration
+# Generated on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+# Tenant: $tenantId
+# Subscription: $subscriptionId
+
+# Azure AI Search
+AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
+AZURE_AI_SEARCH_API_KEY=$searchKey
+AZURE_AI_SEARCH_INDEX=kb-support
+
+# Azure OpenAI
+AZURE_OPENAI_ENDPOINT=$openaiEndpoint
+AZURE_OPENAI_API_KEY=$openaiKey
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large
+AZURE_OPENAI_API_VERSION=2024-08-01-preview
+
+# Function Apps
+RAG_FUNCTION_URL=https://$funcRag.azurewebsites.net
+RAG_FUNCTION_KEY=
+AGENTS_FUNCTION_URL=https://$funcAgents.azurewebsites.net
+AGENTS_FUNCTION_KEY=
+
+# Azure Resources
+RESOURCE_GROUP=$ResourceGroup
+TENANT_ID=$tenantId
+SUBSCRIPTION_ID=$subscriptionId
+
+# Support Email
+SUPPORT_EMAIL_ADDRESS=$SupportEmail
+"@
+
+Set-Content -Path $envFilePath -Value $envContent -Force
+Write-Host "✓ .env file updated" -ForegroundColor Green
+
+# Ingest Knowledge Base
+Write-Host "`n[4/8] Ingesting knowledge base documents..." -ForegroundColor Yellow
+
 Write-Host "  Search: $searchName" -ForegroundColor Gray
 Write-Host "  OpenAI: $openaiName" -ForegroundColor Gray
 
-$ingestPath = Join-Path $PSScriptRoot "..\demos\02-rag-search\ingest"
+$ingestPath = Join-Path $PSScriptRoot "..\demos\02-rag-search"
 
-if (Test-Path $ingestPath) {
+if (Test-Path (Join-Path $ingestPath "ingest-kb.py")) {
     Push-Location $ingestPath
-
-    # Install dependencies
-    Write-Host "  Installing dependencies..." -ForegroundColor Gray
-    npm install --silent 2>&1 | Out-Null
 
     # Set environment variables for ingestion
     $env:AZURE_AI_SEARCH_ENDPOINT = $searchEndpoint
@@ -206,8 +253,8 @@ if (Test-Path $ingestPath) {
     $env:AZURE_OPENAI_ENDPOINT = $openaiEndpoint
     $env:AZURE_OPENAI_API_KEY = $openaiKey
 
-    Write-Host "  Running ingestion script..." -ForegroundColor Gray
-    npm run dev 2>&1 | Out-Null
+    Write-Host "  Running Python ingestion script..." -ForegroundColor Gray
+    python ingest-kb.py
 
     if ($LASTEXITCODE -eq 0) {
         # Verify documents were ingested
@@ -232,90 +279,144 @@ if (Test-Path $ingestPath) {
     exit 1
 }
 
-# Deploy RAG Function Code
-Write-Host "`n[5/8] Deploying RAG Function code..." -ForegroundColor Yellow
+# Deploy Function Apps (Demo 02 RAG + Demo 04 Agents)
+Write-Host "`n[5/8] Deploying Function code..." -ForegroundColor Yellow
+
+# Get both function apps
+$funcAgents = az functionapp list `
+    --resource-group $ResourceGroup `
+    --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
 
 $funcRag = az functionapp list `
     --resource-group $ResourceGroup `
     --query "[?contains(name, 'func-rag')].name" -o tsv | Select-Object -First 1
-
-if (-not $funcRag) {
-    Write-Host "❌ RAG function app not found" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "  Found: $funcRag" -ForegroundColor Gray
-
-# Configure RAG function app settings
-Write-Host "  Configuring app settings..." -ForegroundColor Gray
-az functionapp config appsettings set `
-    --name $funcRag `
-    --resource-group $ResourceGroup `
-    --settings `
-        "AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint" `
-        "AZURE_AI_SEARCH_API_KEY=$searchKey" `
-        "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
-        "AZURE_OPENAI_API_KEY=$openaiKey" `
-    --output none
-
-# Deploy function code (Demo 02)
-$demo02Path = Join-Path $PSScriptRoot "..\demos\02-rag-search"
-if (Test-Path $demo02Path) {
-    Write-Host "  Building and deploying..." -ForegroundColor Gray
-    # RAG function deployment logic here (if needed)
-    Write-Host "✓ RAG function configured" -ForegroundColor Green
-} else {
-    Write-Host "⚠️  RAG function code not found" -ForegroundColor Yellow
-}
-
-# Deploy Agents Function Code
-Write-Host "`n[6/8] Deploying Agents Function code..." -ForegroundColor Yellow
-
-$funcAgents = az functionapp list `
-    --resource-group $ResourceGroup `
-    --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
 
 if (-not $funcAgents) {
     Write-Host "❌ Agents function app not found" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "  Found: $funcAgents" -ForegroundColor Gray
+if (-not $funcRag) {
+    Write-Host "❌ RAG function app not found" -ForegroundColor Red
+    exit 1
+}
 
+Write-Host "  Found: $funcAgents (main orchestration)" -ForegroundColor Gray
+Write-Host "  Found: $funcRag (RAG search)" -ForegroundColor Gray
+
+# ============================================================================
+# Deploy RAG Function First (Demo 02)
+# ============================================================================
+Write-Host "`n  [5a] Deploying RAG function (Demo 02)..." -ForegroundColor Cyan
+$demo02RagPath = Join-Path $PSScriptRoot "..\demos\02-rag-search\rag-function"
+
+if (Test-Path $demo02RagPath) {
+    Push-Location $demo02RagPath
+    
+    Write-Host "    Installing Python dependencies..." -ForegroundColor Gray
+    pip install -r requirements.txt --quiet 2>&1 | Out-Null
+    
+    Write-Host "    Publishing RAG function to Azure..." -ForegroundColor Gray
+    func azure functionapp publish $funcRag --python --force
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ✓ RAG function deployed" -ForegroundColor Green
+    } else {
+        Write-Host "  ❌ RAG function deployment failed" -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+    Pop-Location
+} else {
+    Write-Host "  ❌ RAG function code not found at: $demo02RagPath" -ForegroundColor Red
+    exit 1
+}
+
+# Configure RAG function app settings
+Write-Host "    Configuring RAG function settings..." -ForegroundColor Gray
+az functionapp config appsettings set `
+    --name $funcRag `
+    --resource-group $ResourceGroup `
+    --settings `
+        "AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint" `
+        "AZURE_AI_SEARCH_API_KEY=$searchKey" `
+        "AZURE_AI_SEARCH_INDEX=kb-support" `
+        "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
+        "AZURE_OPENAI_API_KEY=$openaiKey" `
+        "AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini" `
+        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large" `
+        "AZURE_OPENAI_API_VERSION=2024-08-01-preview" `
+    --output none
+
+# Get RAG function key and endpoint for Agents function to call
+Write-Host "    Getting RAG function key..." -ForegroundColor Gray
+$ragFunctionKey = az functionapp keys list --name $funcRag --resource-group $ResourceGroup --query "functionKeys.default" -o tsv
+$ragEndpoint = "https://$funcRag.azurewebsites.net/api/rag-search"
+
+Write-Host "  ✓ RAG function configured" -ForegroundColor Green
+Write-Host "    Endpoint: $ragEndpoint" -ForegroundColor Gray
+
+# ============================================================================
+# Deploy Agents Function (Demo 04)
+# ============================================================================
+Write-Host "`n  [5b] Deploying Agents function (Demo 04)..." -ForegroundColor Cyan
 $demo04Path = Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function"
 
 if (Test-Path $demo04Path) {
     Push-Location $demo04Path
-
-    Write-Host "  Installing dependencies..." -ForegroundColor Gray
+    
+    # Install dependencies and build
+    Write-Host "    Installing dependencies..." -ForegroundColor Gray
     npm install --silent 2>&1 | Out-Null
-
-    Write-Host "  Building TypeScript..." -ForegroundColor Gray
-    npm run build --silent 2>&1 | Out-Null
-
+    
+    Write-Host "    Building TypeScript..." -ForegroundColor Gray
+    npm run build 2>&1 | Out-Null
+    
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ TypeScript build failed" -ForegroundColor Red
+        Write-Host "  ❌ Build failed" -ForegroundColor Red
         Pop-Location
         exit 1
     }
-
-    Write-Host "  Publishing to Azure..." -ForegroundColor Gray
-    Invoke-WithRetry -ScriptBlock {
-        func azure functionapp publish $funcAgents --nozip 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "Function deployment failed"
-        }
+    
+    # Deploy to Azure
+    Write-Host "    Publishing to Azure..." -ForegroundColor Gray
+    func azure functionapp publish $funcAgents --javascript
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ✓ Agents function deployed" -ForegroundColor Green
+    } else {
+        Write-Host "  ❌ Agents function deployment failed" -ForegroundColor Red
+        Pop-Location
+        exit 1
     }
-
-    Write-Host "✓ Agents function code deployed" -ForegroundColor Green
     Pop-Location
 } else {
-    Write-Host "❌ Agents function code not found at: $demo04Path" -ForegroundColor Red
+    Write-Host "  ❌ Agents function code not found at: $demo04Path" -ForegroundColor Red
     exit 1
 }
 
-# Configure Graph Webhook
-Write-Host "`n[7/8] Configuring Graph API and webhook..." -ForegroundColor Yellow
+# Configure Agents function app settings (includes RAG_ENDPOINT and WEBHOOK_URL)
+Write-Host "    Configuring Agents function settings..." -ForegroundColor Gray
+$webhookUrl = "https://$funcAgents.azurewebsites.net/api/GraphWebhook"
+az functionapp config appsettings set `
+    --name $funcAgents `
+    --resource-group $ResourceGroup `
+    --settings `
+        "AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint" `
+        "AZURE_AI_SEARCH_API_KEY=$searchKey" `
+        "AZURE_AI_SEARCH_INDEX=kb-support" `
+        "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
+        "AZURE_OPENAI_API_KEY=$openaiKey" `
+        "SUPPORT_EMAIL_ADDRESS=$SupportEmail" `
+        "RAG_ENDPOINT=$ragEndpoint" `
+        "RAG_API_KEY=$ragFunctionKey" `
+        "WEBHOOK_URL=$webhookUrl" `
+    --output none
+
+Write-Host "✓ Both function apps deployed and configured" -ForegroundColor Green
+
+# Setup Microsoft Graph Webhook
+Write-Host "`n[6/8] Setting up Microsoft Graph webhook..." -ForegroundColor Yellow
 $setupScript = Join-Path $PSScriptRoot "setup-graph-webhook.ps1"
 
 if (Test-Path $setupScript) {
@@ -330,7 +431,7 @@ if (Test-Path $setupScript) {
 }
 
 # Verify Deployment
-Write-Host "`n[8/8] Verifying deployment..." -ForegroundColor Yellow
+Write-Host "`n[7/8] Verifying deployment..." -ForegroundColor Yellow
 $verifyScript = Join-Path $PSScriptRoot "verify-deployment.ps1"
 
 if (Test-Path $verifyScript) {
