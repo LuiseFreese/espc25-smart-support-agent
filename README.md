@@ -68,15 +68,6 @@ Each demo builds on the previous, culminating in a production-ready system:
 ```powershell
 .\scripts\deploy.ps1 -SubscriptionId "<your-sub-id>" -SupportEmail "support@yourdomain.com"
 ```
-
-This script does **everything**:
-- Deploys Azure infrastructure (Bicep)
-- Links Communication Services domain
-- Ingests knowledge base documents
-- Deploys function code
-- Configures Graph API webhook
-- Verifies deployment
-
 <details>
 <summary><b>Manual step-by-step deployment (click to expand)</b></summary>
 
@@ -272,23 +263,6 @@ espc25/
 - **High-Quality Answers:** RAG with 0.7-0.9 confidence from 11 KB documents
 - **Auto-Triage:** Keyword-based classification (100% accuracy)
 - **Production Ready:** Monitoring, error handling, automated deployment
-
-## Contributing
-
-See [ROADMAP.md](docs/ROADMAP.md) for planned features.
-
-## License
-
-MIT
-│   └── parameters.dev.json         # Environment config
-├── tests/
-│   ├── test-demo01-triage.py       # Triage validation
-│   ├── test-demo02-rag.ps1         # RAG confidence tests
-│   └── TEST-EMAIL-SCENARIOS.md     # Email test cases
-└── docs/
-    ├── WEBHOOK-MANAGEMENT.md       # Graph webhook guide
-    └── DEPLOYMENT-ARCHITECTURE.md  # Detailed architecture
-```
 
 
 ## Contributing
