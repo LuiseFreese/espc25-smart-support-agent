@@ -7,10 +7,10 @@ graph TB
     subgraph External["External Services"]
         Customer["👤 Customer"]
         SupportTeam["👥 Support Team"]
-        GraphAPI["Microsoft Graph API<br/>l.bonn@raeuberleiterin.de<br/>Webhooks + Email Access"]
+        GraphAPI["Microsoft Graph API<br/>support@company.com<br/>Webhooks + Email Access"]
     end
 
-    subgraph FuncAgents["func-agents-m4ia3p7llrr4u<br/>Node.js/TypeScript - Sweden Central"]
+    subgraph FuncAgents["func-agents-m4ia3p7llrr4u<br/>Node.js/TypeScript"]
         GraphWebhook["GraphWebhook Function<br/>authLevel: anonymous"]
         ProcessEmail["ProcessSupportEmail Function<br/>1. Get email<br/>2. Check duplicate<br/>3. Triage<br/>4. RAG search<br/>5. Create ticket<br/>6. Auto-reply or forward<br/>7. Mark read"]
         ManageSub["ManageSubscription Function<br/>POST: Create webhook<br/>GET: Check status"]
@@ -19,16 +19,16 @@ graph TB
         TableService["TableStorageService.ts<br/>Ticket CRUD<br/>Duplicate Check"]
     end
 
-    subgraph FuncRAG["func-rag-m4ia3p7llrr4u<br/>Python 3.11 - Sweden Central"]
+    subgraph FuncRAG["func-rag-m4ia3p7llrr4u<br/>Python 3.11"]
         RAGSearch["rag_search Function<br/>1. Embed question<br/>2. Semantic search<br/>3. Generate answer<br/>4. Map confidence"]
     end
 
-    subgraph AIServices["AI Services - Sweden Central"]
+    subgraph AIServices["AI Services"]
         OpenAI["Azure OpenAI<br/>oai-agents-m4ia3p7llrr4u<br/>• gpt-4o-mini<br/>• text-embedding-3-large"]
         Search["Azure AI Search<br/>srch-agents-m4ia3p7llrr4u<br/>• 11 KB documents<br/>• Semantic ranking<br/>• Hybrid search"]
     end
 
-    subgraph DataStorage["Data & Storage - Sweden Central"]
+    subgraph DataStorage["Data & Storage"]
         Storage["Storage Account<br/>stagentsm4ia3p7llrr4u<br/>• SupportTickets table<br/>• Function app storage"]
     end
 
@@ -36,13 +36,13 @@ graph TB
         CommServices["Azure Communication Services<br/>comm-agents-m4ia3p7llrr4u<br/>• Email domain linked<br/>• DoNotReply@...azurecomm.net"]
     end
 
-    subgraph Monitoring["Monitoring & Logging - Sweden Central"]
+    subgraph Monitoring["Monitoring & Logging"]
         AppInsights["Application Insights<br/>appi-smart-agents-m4ia3p7llrr4u<br/>• Request tracking<br/>• Dependency calls<br/>• Custom metrics"]
         LogAnalytics["Log Analytics<br/>log-smart-agents-m4ia3p7llrr4u<br/>• 30-day retention<br/>• Query workspace"]
         AlertRule["Smart Detector Alert<br/>Failure Anomalies"]
     end
 
-    subgraph Infrastructure["Infrastructure - Sweden Central"]
+    subgraph Infrastructure["Infrastructure"]
         AppPlan["App Service Plan<br/>plan-agents-m4ia3p7llrr4u<br/>• Y1 Consumption<br/>• Linux"]
         KeyVault["Key Vault<br/>kv-agents-m4ia3p7llrr4u<br/>• Future: Secret refs<br/>• RBAC configured"]
         AIHub["AI Hub<br/>aihub-agents-m4ia3p7llrr4u"]
@@ -125,7 +125,10 @@ graph LR
     R10 -->|"Logs"| R9
     R2 -.->|"Telemetry"| R10
     R3 -.->|"Telemetry"| R10
+    R10 -.->|"Anomalies"| R14
     R12 -.->|"Parent"| R13
+    R12 -.->|"Uses"| R11
+    R12 -.->|"Uses"| R4
     R5 -->|"Uses"| R15
 
     style R1 fill:#fff3e0
