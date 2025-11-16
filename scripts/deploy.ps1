@@ -26,7 +26,7 @@ function Invoke-WithRetry {
         [int]$MaxRetries = 3,
         [int]$DelaySeconds = 10
     )
-    
+
     $attempt = 1
     while ($attempt -le $MaxRetries) {
         try {
@@ -112,7 +112,7 @@ Invoke-WithRetry -ScriptBlock {
         --parameters currentUserObjectId=$currentUserObjectId `
         --name $deploymentName `
         --output none
-    
+
     if ($LASTEXITCODE -ne 0) {
         throw "Infrastructure deployment failed"
     }
@@ -135,7 +135,7 @@ $commServicesName = az resource list `
 
 if ($commServicesName) {
     Write-Host "  Found Communication Services: $commServicesName" -ForegroundColor Gray
-    
+
     $subId = az account show --query "id" -o tsv
     $emailServiceName = "$commServicesName-email"
     $emailDomainId = "/subscriptions/$subId/resourceGroups/$ResourceGroup/providers/Microsoft.Communication/EmailServices/$emailServiceName/domains/AzureManagedDomain"
@@ -156,21 +156,21 @@ if ($commServicesName) {
                 --resource-group $ResourceGroup `
                 --linked-domains $emailDomainId `
                 --output none 2>&1 | Out-Null
-            
+
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to link email domain"
             }
         }
         Write-Host "✓ Communication Services domain linked" -ForegroundColor Green
     }
-    
+
     # Get sender address
     $senderAddress = az communication email domain show `
         --domain-name "AzureManagedDomain" `
         --email-service-name $emailServiceName `
         --resource-group $ResourceGroup `
         --query "mailFromSenderDomain" -o tsv 2>$null
-    
+
     if ($senderAddress) {
         Write-Host "  Sender address: donotreply@$senderAddress" -ForegroundColor Gray
     }
@@ -262,30 +262,30 @@ if (Test-Path (Join-Path $ingestPath "ingest-kb.py")) {
         $maxAttempts = 12
         $attempt = 0
         $documentCount = 0
-        
+
         while ($attempt -lt $maxAttempts) {
             Start-Sleep -Seconds 5
             $attempt++
-            
+
             try {
                 $indexStats = Invoke-RestMethod `
                     -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
                     -Headers @{ 'api-key' = $searchKey } `
                     -ErrorAction Stop
-                
+
                 $documentCount = $indexStats.documentCount
-                
+
                 if ($documentCount -gt 0) {
                     Write-Host "✓ Knowledge base ingested ($documentCount documents)" -ForegroundColor Green
                     break
                 }
-                
+
                 Write-Host "    Attempt $attempt/$maxAttempts - Indexing in progress..." -ForegroundColor Gray
             } catch {
                 Write-Host "    Attempt $attempt/$maxAttempts - Checking index status..." -ForegroundColor Gray
             }
         }
-        
+
         if ($documentCount -eq 0) {
             Write-Host "⚠️  Documents uploaded but indexing not yet complete" -ForegroundColor Yellow
             Write-Host "    This is normal for large KB. Documents will be available shortly." -ForegroundColor Gray
@@ -334,13 +334,13 @@ $demo02RagPath = Join-Path $PSScriptRoot "..\demos\02-rag-search\rag-function"
 
 if (Test-Path $demo02RagPath) {
     Push-Location $demo02RagPath
-    
+
     Write-Host "    Installing Python dependencies..." -ForegroundColor Gray
     pip install -r requirements.txt --quiet 2>&1 | Out-Null
-    
+
     Write-Host "    Publishing RAG function to Azure..." -ForegroundColor Gray
     func azure functionapp publish $funcRag --python --force
-    
+
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  ✓ RAG function deployed" -ForegroundColor Green
     } else {
@@ -386,24 +386,24 @@ $demo04Path = Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function
 
 if (Test-Path $demo04Path) {
     Push-Location $demo04Path
-    
+
     # Install dependencies and build
     Write-Host "    Installing dependencies..." -ForegroundColor Gray
     npm install --silent 2>&1 | Out-Null
-    
+
     Write-Host "    Building TypeScript..." -ForegroundColor Gray
     npm run build 2>&1 | Out-Null
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  ❌ Build failed" -ForegroundColor Red
         Pop-Location
         exit 1
     }
-    
+
     # Deploy to Azure
     Write-Host "    Publishing to Azure..." -ForegroundColor Gray
     func azure functionapp publish $funcAgents --javascript
-    
+
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  ✓ Agents function deployed" -ForegroundColor Green
     } else {
@@ -437,13 +437,61 @@ az functionapp config appsettings set `
 
 Write-Host "✓ Both function apps deployed and configured" -ForegroundColor Green
 
+# ============================================================================
+# Create SupportTickets Table in Storage Account
+# ============================================================================
+Write-Host "`n[5c] Creating SupportTickets table..." -ForegroundColor Cyan
+
+# Get storage account details
+$storageAccountName = az storage account list --resource-group $ResourceGroup --query "[?contains(name, 'stagents')].name" -o tsv | Select-Object -First 1
+if (-not $storageAccountName) {
+    Write-Host "⚠️  No storage account found" -ForegroundColor Yellow
+} else {
+    Write-Host "    Creating table in storage account: $storageAccountName" -ForegroundColor Gray
+    
+    # Get storage account key
+    $storageKey = az storage account keys list --account-name $storageAccountName --resource-group $ResourceGroup --query "[0].value" -o tsv
+
+    # Create the table using Azure CLI
+    az storage table create `
+        --name SupportTickets `
+        --account-name $storageAccountName `
+        --account-key $storageKey `
+        --output none 2>$null
+
+    # Check result (0 = created successfully, 409 = already exists)
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ SupportTickets table created" -ForegroundColor Green
+    } elseif ($LASTEXITCODE -eq 409) {
+        Write-Host "✓ SupportTickets table already exists" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  Could not verify table creation (may already exist)" -ForegroundColor Yellow
+    }
+
+    # Verify table exists by listing tables
+    Write-Host "    Verifying table..." -ForegroundColor Gray
+    $tables = az storage table list `
+        --account-name $storageAccountName `
+        --account-key $storageKey `
+        --query "[?name=='SupportTickets'].name" `
+        -o tsv 2>$null
+
+    if ($tables -eq "SupportTickets") {
+        Write-Host "✓ SupportTickets table verified in storage account" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  Could not verify table existence" -ForegroundColor Yellow
+    }
+}
+
 # Setup Microsoft Graph Webhook
 Write-Host "`n[6/8] Setting up Microsoft Graph webhook..." -ForegroundColor Yellow
 $setupScript = Join-Path $PSScriptRoot "setup-graph-webhook.ps1"
 
 if (Test-Path $setupScript) {
-    & $setupScript -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail -AppName "SmartSupportAgent-$((Get-Random -Maximum 9999).ToString('0000'))"
-    
+    # Use consistent app name based on resource group to enable reuse across deployments
+    $appName = "SmartSupportAgent-$ResourceGroup"
+    & $setupScript -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail -AppName $appName
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "⚠️  Graph webhook setup had issues - you may need to run setup-graph-webhook.ps1 manually" -ForegroundColor Yellow
     }

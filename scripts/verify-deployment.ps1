@@ -31,7 +31,7 @@ $commServices = az resource list --resource-group $ResourceGroup --resource-type
 
 if ($commServices) {
     $linkedDomains = az communication show --name $commServices --resource-group $ResourceGroup --query "linkedDomains" -o json | ConvertFrom-Json
-    
+
     if ($linkedDomains -and $linkedDomains.Count -gt 0) {
         Write-Host "✓ Communication Services configured: $commServices" -ForegroundColor Green
         Write-Host "✓ Email domain linked" -ForegroundColor Green
@@ -61,7 +61,7 @@ try {
     $ragKey = az functionapp keys list --name $funcRag --resource-group $ResourceGroup --query "functionKeys.default" -o tsv
     $body = @{ question = "VPN disconnecting" } | ConvertTo-Json
     $ragResponse = Invoke-RestMethod -Uri "https://$funcRag.azurewebsites.net/api/rag-search" -Method Post -Body $body -ContentType "application/json" -Headers @{ 'x-functions-key' = $ragKey } -ErrorAction Stop
-    
+
     if ($ragResponse.confidence -ge 0.7) {
         Write-Host "✓ RAG endpoint working (confidence: $($ragResponse.confidence))" -ForegroundColor Green
     } elseif ($ragResponse.confidence -ge 0.4) {
@@ -85,7 +85,7 @@ if ($searchService) {
     $searchKey = az search admin-key show --resource-group $ResourceGroup --service-name $searchService --query "primaryKey" -o tsv
     try {
         $indexStats = Invoke-RestMethod -Uri "https://$searchService.search.windows.net/indexes/kb-support/stats?api-version=2023-11-01" -Headers @{ 'api-key' = $searchKey } -ErrorAction Stop
-        
+
         if ($indexStats.documentCount -gt 0) {
             Write-Host "✓ Knowledge base has $($indexStats.documentCount) documents" -ForegroundColor Green
         } else {
@@ -108,12 +108,12 @@ if ($graphClientId) {
     try {
         $funcKey = az functionapp keys list --name $funcAgents --resource-group $ResourceGroup --query "functionKeys.default" -o tsv
         $result = Invoke-RestMethod -Uri "https://$funcAgents.azurewebsites.net/api/managesubscription" -Method Get -Headers @{ 'x-functions-key' = $funcKey } -ErrorAction Stop
-        
+
         if ($result.count -gt 0) {
             $subscription = $result.subscriptions[0]
             $expirationDate = [datetime]::Parse($subscription.expirationDateTime)
             $daysUntilExpiry = ($expirationDate - (Get-Date)).Days
-            
+
             if ($daysUntilExpiry -gt 1) {
                 Write-Host "✓ Webhook subscription active (expires in $daysUntilExpiry days)" -ForegroundColor Green
             } else {

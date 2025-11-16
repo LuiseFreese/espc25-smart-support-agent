@@ -27,10 +27,26 @@ Write-Host "✓ Found: $functionAppName" -ForegroundColor Green
 
 # Step 2: Create App Registration
 Write-Host "`n[Step 2/7] Creating App Registration..." -ForegroundColor Yellow
-$existingApp = az ad app list --display-name $AppName --query "[0].appId" -o tsv
-if ($existingApp) {
-    Write-Host "⚠️  App registration '$AppName' already exists (ID: $existingApp)" -ForegroundColor Yellow
-    $appId = $existingApp
+
+# Check for existing apps with the same name and clean up duplicates
+$existingApps = az ad app list --display-name $AppName --query "[].appId" -o tsv
+$appCount = ($existingApps | Measure-Object).Count
+
+if ($appCount -gt 1) {
+    Write-Host "⚠️  Found $appCount app registrations with name '$AppName' - cleaning up duplicates..." -ForegroundColor Yellow
+    $appsArray = $existingApps -split "`n"
+    # Delete all but the first one
+    for ($i = 1; $i -lt $appsArray.Length; $i++) {
+        if ($appsArray[$i]) {
+            Write-Host "  Deleting duplicate app: $($appsArray[$i])" -ForegroundColor Gray
+            az ad app delete --id $appsArray[$i] 2>$null
+        }
+    }
+    $appId = $appsArray[0]
+    Write-Host "✓ Using existing app registration: $appId" -ForegroundColor Green
+} elseif ($appCount -eq 1) {
+    $appId = $existingApps
+    Write-Host "✓ Using existing app registration: $appId" -ForegroundColor Green
 } else {
     $appId = az ad app create `
         --display-name $AppName `
@@ -38,6 +54,10 @@ if ($existingApp) {
         --query "appId" -o tsv
     Write-Host "✓ Created app registration: $appId" -ForegroundColor Green
 }
+
+# Add redirect URIs for admin consent (required for AADSTS500113 error prevention)
+Write-Host "  Adding redirect URIs for admin consent..." -ForegroundColor Gray
+az ad app update --id $appId --web-redirect-uris "https://login.microsoftonline.com/common/oauth2/nativeclient" "http://localhost" "https://portal.azure.com" | Out-Null
 
 # Step 3: Add Microsoft Graph API Permissions
 Write-Host "`n[Step 3/7] Adding Microsoft Graph API Permissions..." -ForegroundColor Yellow
@@ -70,12 +90,15 @@ try {
     Write-Host "  Waiting 30 seconds for permissions to propagate..." -ForegroundColor Gray
     Start-Sleep -Seconds 30
 } catch {
-    Write-Host "⚠️  Admin consent may have failed. Manual approval might be needed:" -ForegroundColor Yellow
-    Write-Host "  1. Go to Azure Portal > App Registrations > $AppName" -ForegroundColor Gray
-    Write-Host "  2. Navigate to 'API permissions'" -ForegroundColor Gray
-    Write-Host "  3. Click 'Grant admin consent for <tenant>'" -ForegroundColor Gray
-    Write-Host "  Continuing anyway..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 5
+    Write-Host "⚠️  Automated admin consent failed. Opening browser for manual consent..." -ForegroundColor Yellow
+    $tenantId = az account show --query "tenantId" -o tsv
+    $consentUrl = "https://login.microsoftonline.com/$tenantId/adminconsent?client_id=$appId&redirect_uri=https://portal.azure.com"
+    Write-Host "  Opening: $consentUrl" -ForegroundColor Gray
+    Start-Process $consentUrl
+    Write-Host "  Please grant admin consent in the browser window, then press Enter to continue..." -ForegroundColor Yellow
+    Read-Host
+    Write-Host "  Waiting 30 seconds for permissions to propagate..." -ForegroundColor Gray
+    Start-Sleep -Seconds 30
 }
 
 # Step 5: Create Client Secret
@@ -204,6 +227,10 @@ if ($commConnectionString) {
 # Step 7: Create Webhook Subscription
 Write-Host "`n[Step 7/7] Creating Webhook Subscription..." -ForegroundColor Yellow
 
+# Wait for app settings to propagate and permissions to be fully active
+Write-Host "  Waiting 30 seconds for app settings and permissions to propagate..." -ForegroundColor Gray
+Start-Sleep -Seconds 30
+
 # Get function key
 $functionKey = az functionapp keys list `
     --name $functionAppName `
@@ -224,8 +251,23 @@ try {
 } catch {
     Write-Host "⚠️  Could not create webhook subscription automatically" -ForegroundColor Yellow
     Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "  You can create it manually later with:" -ForegroundColor Yellow
-    Write-Host "  Invoke-RestMethod -Uri `"$subscriptionUrl`" -Method Post -Headers @{ 'x-functions-key' = '$functionKey' }" -ForegroundColor Gray
+    Write-Host "`n  Retrying in 30 seconds (permissions may still be propagating)..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 30
+    
+    try {
+        $result = Invoke-RestMethod -Uri $subscriptionUrl `
+            -Method Post `
+            -Headers @{ "x-functions-key" = $functionKey } `
+            -ContentType "application/json"
+        
+        Write-Host "✓ Webhook subscription created on retry!" -ForegroundColor Green
+        Write-Host "  - Subscription ID: $($result.subscriptionId)" -ForegroundColor Gray
+        Write-Host "  - Expires: $($result.expirationDateTime)" -ForegroundColor Gray
+    } catch {
+        Write-Host "⚠️  Webhook subscription still failed after retry" -ForegroundColor Yellow
+        Write-Host "  You can create it manually with:" -ForegroundColor Yellow
+        Write-Host "  Invoke-RestMethod -Uri `"$subscriptionUrl`" -Method Post -Headers @{ 'x-functions-key' = '$functionKey' }" -ForegroundColor Gray
+    }
 }
 
 # Summary
