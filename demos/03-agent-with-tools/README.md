@@ -190,39 +190,34 @@ const apiKey = process.env.EXTERNAL_API_KEY; // Pulled from Key Vault
 
 ## Agent Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ User Query: "Where is my order 12345?"                   │
-└───────────────────┬──────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────────────────────┐
-│ Azure OpenAI (gpt-4o-mini)                               │
-│                                                           │
-│ 1. Analyzes query                                        │
-│ 2. Available tools: GetOrderStatus, CreateTicket         │
-│ 3. Decision: Query mentions "order" + number             │
-│ 4. Selected tool: GetOrderStatus(orderId="12345")        │
-└───────────────────┬──────────────────────────────────────┘
-                    ↓ Function call request
-┌──────────────────────────────────────────────────────────┐
-│ Azure Function: GetOrderStatus                           │
-│                                                           │
-│ GET /api/GetOrderStatus?orderId=12345                    │
-│   → Queries order database                               │
-│   → Returns: {status: "shipped", tracking: "UPS12345"}   │
-└───────────────────┬──────────────────────────────────────┘
-                    ↓ Function result
-┌──────────────────────────────────────────────────────────┐
-│ Azure OpenAI (gpt-4o-mini)                               │
-│                                                           │
-│ Receives function result, synthesizes natural response:  │
-│ "Your order is shipped! Tracking: UPS12345"              │
-└──────────────────────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────────────────────┐
-│ Application Insights                                     │
-│ Correlation ID tracks entire flow with telemetry         │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["User Query:<br/>'Where is my order 12345?'"] --> B[Azure OpenAI<br/>gpt-4o-mini]
+    
+    B --> B1{Analyze Query}
+    B1 --> B2["Available tools:<br/>- GetOrderStatus<br/>- CreateTicket"]
+    B2 --> B3["Decision: Query mentions<br/>'order' + number"]
+    B3 --> B4["Select tool:<br/>GetOrderStatus(orderId='12345')"]
+    
+    B4 --> C["Azure Function:<br/>GetOrderStatus"]
+    C --> C1["GET /api/GetOrderStatus<br/>?orderId=12345"]
+    C1 --> C2["Query order database"]
+    C2 --> C3["Return:<br/>{status: 'shipped',<br/>tracking: 'UPS12345'}"]
+    
+    C3 --> D[Azure OpenAI<br/>gpt-4o-mini]
+    D --> D1["Synthesize response:<br/>'Your order is shipped!<br/>Tracking: UPS12345'"]
+    
+    D1 --> E[Application Insights]
+    E --> E1["Correlation ID tracks<br/>entire flow with telemetry"]
+    
+    style A fill:#e1f5ff,stroke:#0078d4,stroke-width:2px
+    style B fill:#fff4ce,stroke:#ffb900,stroke-width:2px
+    style B4 fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style C fill:#f0e6ff,stroke:#8661c5,stroke-width:2px
+    style C3 fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px
+    style D fill:#fff4ce,stroke:#ffb900,stroke-width:2px
+    style D1 fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style E fill:#f8d7da,stroke:#dc3545,stroke-width:2px
 ```
 
 ## When to Use Agents vs Traditional Code
@@ -497,25 +492,9 @@ Assistant: Your order 12345 is currently in transit. The expected delivery date 
         └── call-agent.ts      # Function calling loop
 ```
 
-## Deploy to Azure
+**Note:** This demo is for learning/testing function calling concepts. Production deployment is handled via `scripts/deploy.ps1` (see main [README.md](../../README.md)).
 
-### Deploy Functions
-
-```bash
-cd function-tool
-npm run build
-
-# Deploy
-func azure functionapp publish <function-app-name>
-```
-
-### Update Agent Configuration
-
-Update `.env` with production URL:
-
-```env
-AZURE_FUNCTION_APP_URL=https://func-agents-<suffix>.azurewebsites.net/api
-```
+---
 
 ## Monitoring
 
@@ -570,11 +549,6 @@ Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini
 - Parameter extraction from natural language (order IDs, customer IDs)
 - Multi-turn conversation (assistant + tool + assistant flow)
 - JSON schema validation (all tool calls matched expected format)
-**What's Working**:
-- Function calling mechanism (model correctly formats tool calls)
-- Parameter extraction from natural language (order IDs, customer IDs)
-- Multi-turn conversation (assistant + tool + assistant flow)
-- JSON schema validation (all tool calls matched expected format)
 - Response synthesis (final answers are helpful and natural)
 - Implicit problem detection (enhanced system prompt achieves 100% accuracy)
 
@@ -591,7 +565,6 @@ for customer problems.
 ```
 
 **Known Limitations**:
-- ⚠️ Tool deployment: Functions exist but **not yet deployed to Azure** (tested with mocks)
 - ⚠️ Temperature: Using 0.0 for tool selection, 0.7 for final response (trade-off between determinism and naturalness)
 
 ### 📝 Test Command
@@ -607,94 +580,11 @@ python tests/test-demo03-agent.py
 
 ### Production Status
 
-**Current State**: **DEPLOYED AND FULLY OPERATIONAL** - 100% functional in production
+**Current State**: Demo 03 functions are **DEPLOYED** to `func-agents-dw7z4hg4ssn2k`.
 
-**Deployment Date**: November 14, 2025
+**Note:** This demo teaches function calling concepts. Deployment is handled via `scripts/deploy.ps1` (see main [README.md](../../README.md)).
 
-**Verified Components**:
-- Azure OpenAI function calling (`gpt-4o-mini`) - 100% accuracy
-- Tool schema definitions (JSON schema format)
-- Parameter extraction from queries - 100% accuracy
-- Multi-step agent workflow
-- Response synthesis
-- Enhanced system prompt for implicit problem detection
-- **GetOrderStatus function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/getorderstatus`
-- **CreateTicket function deployed** - `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/createticket`
-
-**Production Test Results**:
-```bash
-# Order status query
-User: "Where is my order 12345?"
-Tool called: getOrderStatus (orderId: 12345)
-Result: Order In Transit, ETA Nov 15, tracking TRK-98765-ABCD ✅
-
-# Implicit help request
-User: "I need help with my printer, it's not working. My customer ID is CUST123"
-Tool called: createTicket (title: "Printer Not Working", customerId: CUST123)
-Result: Ticket TKT-1763145474942-6097F277 created ✅
-```
-
-### 🚀 Deployment Instructions
-
-Functions are already deployed to `func-agents-dw7z4hg4ssn2k`! To redeploy after changes:
-
-```bash
-# Build function app
-cd demos/03-agent-with-tools/function-tool
-npm install
-npm run build
-
-# Deploy to Azure
-func azure functionapp publish func-agents-dw7z4hg4ssn2k --typescript
-
-# Test deployed functions
-# GetOrderStatus
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/getorderstatus?orderId=12345"
-
-# CreateTicket
-$body = @{ title = "Test"; description = "Testing"; customerId = "TEST" } | ConvertTo-Json
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/createticket" -Method Post -Body $body -ContentType "application/json"
-
-# Test agent with production functions
-cd demos/03-agent-with-tools/agent
-npm install
-npm run dev -- "Where is my order 12345?"
-```
-
-**When to deploy**:
-- Need real business logic (database queries, ticket systems)
-- Production agent scenarios
-- Integration with external systems
-- Load testing and performance optimization
-
-**When to use mocks**:
-- Development and testing
-- Demos and prototypes
-- Cost-sensitive scenarios
-- Offline development
-
-### 💡 Improvement Recommendations
-
-1. **System Prompt Enhancement**:
-   ```
-   "When a user mentions a problem or asks for help, proactively create a support ticket using the createTicket tool."
-   ```
-
-2. **Add More Tools**:
-   - `updateOrderAddress` - Change delivery address
-   - `cancelOrder` - Cancel pending orders
-   - `searchKnowledgeBase` - Integration with Demo 02 RAG
-   - `escalateToHuman` - Route to human agent
-
-3. **Error Handling**:
-   - Retry logic for failed tool calls
-   - Graceful degradation when tools unavailable
-   - Better error messages for users
-
-4. **Observability**:
-   - Log all tool calls to Application Insights
-   - Track success/failure rates
-   - Monitor latency per tool
+---
 
 ## Troubleshooting
 
