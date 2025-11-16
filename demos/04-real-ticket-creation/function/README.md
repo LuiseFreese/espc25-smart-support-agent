@@ -49,7 +49,7 @@ flowchart TD
 
 ## Azure Resources Used
 
-### Azure Functions - Email Processing (\unc-agents-*\)
+### Azure Functions - Email Processing (`func-agents-*`)
 
 **Purpose:** Serverless compute for email orchestration and business logic
 
@@ -120,17 +120,17 @@ flowchart TD
 **Fields:**
 | Field | Type | Purpose | Example |
 |-------|------|---------|---------|
-| \TicketID\ | string | Display ID (same as Row Key) | TKT-20251115-A3B7F2 |
-| \Title\ | string | Email subject | "VPN not connecting" |
-| \Description\ | string | Email body content | "Can't connect to VPN from home..." |
-| \CustomerEmail\ | string | Sender's email address | customer@example.com |
-| \Category\ | string | Triage category | Network, Access, Billing, Software, Other |
-| \Priority\ | string | Triage priority | High, Medium, Low |
-| \Status\ | string | Processing status | New, AI Resolved, Needs Human Review |
-| \AIResponse\ | string | Generated answer from RAG | "To fix VPN issues: 1. Check firewall..." |
-| \Confidence\ | number | RAG confidence score | 0.85 (range: 0.1-0.9) |
-| \EmailMessageId\ | string | Graph message ID (for deduplication) | AAMkAGZjOT... |
-| \Timestamp\ | datetime | Ticket creation time | 2025-11-15T13:45:00Z |
+| TicketID | string | Display ID (same as Row Key) | TKT-20251115-A3B7F2 |
+| Title | string | Email subject | "VPN not connecting" |
+| Description | string | Email body content | "Can't connect to VPN from home..." |
+| CustomerEmail | string | Sender's email address | customer@example.com |
+| Category | string | Triage category | Network, Access, Billing, Software, Other |
+|\Priority | string | Triage priority | High, Medium, Low |
+|\Status | string | Processing status | New, AI Resolved, Needs Human Review |
+| AIResponse | string | Generated answer from RAG | "To fix VPN issues: 1. Check firewall..." |
+| Confidence | number | RAG confidence score | 0.85 (range: 0.1-0.9) |
+| EmailMessageId | string | Graph message ID (for deduplication) | AAMkAGZjOT... |
+| Timestamp| datetime | Ticket creation time | 2025-11-15T13:45:00Z |
 
 **Deduplication Logic:**
 Before creating ticket, query Table Storage:
@@ -222,15 +222,15 @@ const response = await fetch(process.env.RAG_ENDPOINT, {
 4. Scores results using semantic reranker (0-4)
 5. Maps score to confidence (0.1-0.9)
 6. Generates answer via GPT-4o-mini with top retrieved passages as context
-7. Returns: \{answer: "...", confidence: 0.85, sources: [...]}\
+7. Returns: `{answer: "...", confidence: 0.85, sources: [...]}`
 
 **Confidence Thresholds:**
-- \u22650.7: Auto-reply to customer (high confidence)
+- ≥0.7: Auto-reply to customer (high confidence)
 - <0.7: Escalate to human review (low confidence or ambiguous)
 
 See [Demo 02 README](../../02-rag-search/README.md) for detailed RAG architecture.
 
-### Application Insights (\ppi-smart-agents-*\)
+### Application Insights (`appi-smart-agents-*`)
 
 **Purpose:** End-to-end observability and monitoring
 
@@ -239,13 +239,10 @@ See [Demo 02 README](../../02-rag-search/README.md) for detailed RAG architectur
 **1. Request Traces**
 - Every function execution with duration
 - HTTP status codes and response sizes
-- Correlation IDs linking email \u2192 triage \u2192 RAG \u2192 ticket
-
-**2. Custom Events**
-- \EmailProcessed\: New email received
-- \TicketCreated\: Ticket stored in Table Storage
-- \AutoReply\: High-confidence auto-reply sent
-- \Escalated\: Low-confidence escalation to human
+- Correlation IDs linking email \u2192 triage \u2192 RAG \u2192 ticke
+**2. Custom Events**- EmailProcessed\: New email received
+- TicketCreated\: Ticket stored in Table Storage
+- AutoReply: High-confidence auto-reply sent- Escalated: Low-confidence escalation to human
 
 **3. Dependencies**
 - Graph API calls (read email, send reply)
@@ -258,7 +255,8 @@ See [Demo 02 README](../../02-rag-search/README.md) for detailed RAG architectur
 - Graph API auth failures
 
 **KQL Query Examples:**
-\\\kusto
+
+```kusto
 // Average confidence by category
 customEvents
 | where name == "TicketCreated"
@@ -269,7 +267,7 @@ customEvents
 requests
 | where operation_Name == "GraphWebhook"
 | summarize avg(duration), max(duration), percentile(duration, 95)
-\\\
+```
 
 ## Configuration Requirements
 

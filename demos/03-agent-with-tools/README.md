@@ -285,28 +285,7 @@ To extend this agent:
 3. **Add Tool Validation:** Validate function outputs before returning to model
 4. **Implement Retry Logic:** Handle transient failures in tool execution
 
-See main [README.md](../../README.md) for deployment instructions.
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "node",
-    "APPLICATIONINSIGHTS_CONNECTION_STRING": "<from .env>",
-    "AZURE_OPENAI_ENDPOINT": "<from .env>",
-    "AZURE_OPENAI_API_KEY": "<from .env>"
-  }
-}
-```
 
-### Start Functions Locally
-
-```powershell
-npm start
-```
-
-Expected output:
-```
-Functions:
-  GetOrderStatus: [GET] http://localhost:7071/api/GetOrderStatus
-  CreateTicket: [POST] http://localhost:7071/api/CreateTicket
-```
 
 ### Test Functions
 
@@ -331,9 +310,17 @@ Invoke-RestMethod -Uri "http://localhost:7071/api/CreateTicket" `
 - **GetOrderStatus**: `{"orderId":"12345","status":"In Transit","eta":"2025-11-15","trackingNumber":"TRK-98765-ABCD"}`
 - **CreateTicket**: `{"ticketId":"TKT-5678","status":"created","createdAt":"2024-11-09T18:30:00Z"}`
 
-## Part 2: Agent Client
+---
 
-### Setup
+## How to Use This Demo (For Learning/Testing)
+
+### Step 1: Start Azure Functions Locally
+
+See function setup instructions in `function-tool/` directory.
+
+### Step 2: Run Agent Client
+
+#### Setup
 
 ```powershell
 cd ..\agent
@@ -371,9 +358,9 @@ The agent supports two authentication modes:
 
 This prevents authentication conflicts when redeploying or switching environments.
 
-### Run Agent
+#### Run Agent
 
-**IMPORTANT**: Azure Functions must be running (see Part 1) before starting the agent!
+**IMPORTANT**: Azure Functions must be running (see Step 1) before starting the agent!
 
 ```powershell
 # Query order status
@@ -386,7 +373,7 @@ npm run dev -- "Create a support ticket for customer CUST-001 about VPN disconne
 npm run dev -- "Check order 67890 and if it's not delivered, create a ticket"
 ```
 
-### Expected Output
+#### Expected Output
 
 ```
 💬 User: Where is order 12345?
@@ -406,7 +393,7 @@ npm run dev -- "Check order 67890 and if it's not delivered, create a ticket"
 Assistant: Your order 12345 is currently in transit. The expected delivery date is November 15, 2025. The tracking number is TRK-98765-ABCD. Your order includes a Laptop Stand and a Wireless Mouse.
 ```
 
-### How It Works (Under the Hood)
+#### How It Works (Under the Hood)
 
 1. **User Query**: "Where is my order 12345?"
 
@@ -429,7 +416,7 @@ Assistant: Your order 12345 is currently in transit. The expected delivery date 
 5. **Final Answer** (Azure OpenAI synthesis):
    > "Your order 12345 is currently in transit. Expected delivery: November 15, 2025. Tracking: TRK-98765-ABCD."
 
-### Cost Analysis
+#### Cost Analysis
 
 **Per Agent Interaction**:
 - **Input tokens**: ~200 tokens (query + tool definitions + context)
@@ -542,9 +529,9 @@ Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini
 - Final answer synthesis: Natural language responses generated correctly
 - Multi-step reasoning: Model → Tool → Model workflow working perfectly
 
-### 🔍 Observations
+### Key Findings
 
-**What's Working**:
+**Validated Capabilities**:
 - Function calling mechanism (model correctly formats tool calls)
 - Parameter extraction from natural language (order IDs, customer IDs)
 - Multi-turn conversation (assistant + tool + assistant flow)
@@ -567,7 +554,7 @@ for customer problems.
 **Known Limitations**:
 - ⚠️ Temperature: Using 0.0 for tool selection, 0.7 for final response (trade-off between determinism and naturalness)
 
-### 📝 Test Command
+### Test Command
 
 ```bash
 # Python SDK test with mock tools (current validation method)
