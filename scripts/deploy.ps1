@@ -257,16 +257,38 @@ if (Test-Path (Join-Path $ingestPath "ingest-kb.py")) {
     python ingest-kb.py
 
     if ($LASTEXITCODE -eq 0) {
-        # Verify documents were ingested
-        $indexStats = Invoke-RestMethod `
-            -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
-            -Headers @{ 'api-key' = $searchKey } `
-            -ErrorAction SilentlyContinue
+        # Wait for Azure AI Search indexing to complete (asynchronous process)
+        Write-Host "  Waiting for search indexing to complete..." -ForegroundColor Gray
+        $maxAttempts = 12
+        $attempt = 0
+        $documentCount = 0
         
-        if ($indexStats.documentCount -gt 0) {
-            Write-Host "✓ Knowledge base ingested ($($indexStats.documentCount) documents)" -ForegroundColor Green
-        } else {
-            Write-Host "⚠️  Ingestion completed but no documents found in index" -ForegroundColor Yellow
+        while ($attempt -lt $maxAttempts) {
+            Start-Sleep -Seconds 5
+            $attempt++
+            
+            try {
+                $indexStats = Invoke-RestMethod `
+                    -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
+                    -Headers @{ 'api-key' = $searchKey } `
+                    -ErrorAction Stop
+                
+                $documentCount = $indexStats.documentCount
+                
+                if ($documentCount -gt 0) {
+                    Write-Host "✓ Knowledge base ingested ($documentCount documents)" -ForegroundColor Green
+                    break
+                }
+                
+                Write-Host "    Attempt $attempt/$maxAttempts - Indexing in progress..." -ForegroundColor Gray
+            } catch {
+                Write-Host "    Attempt $attempt/$maxAttempts - Checking index status..." -ForegroundColor Gray
+            }
+        }
+        
+        if ($documentCount -eq 0) {
+            Write-Host "⚠️  Documents uploaded but indexing not yet complete" -ForegroundColor Yellow
+            Write-Host "    This is normal for large KB. Documents will be available shortly." -ForegroundColor Gray
         }
     } else {
         Write-Host "❌ Knowledge base ingestion failed" -ForegroundColor Red
