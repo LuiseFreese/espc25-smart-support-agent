@@ -75,7 +75,8 @@ out/
 Thumbs.db
 
 # Session planning (internal)
-SESSION-STORYLINE.md
+# Session-specific documentation (excluded - sensitive presentation notes)
+docs/SESSION-STORYLINE.md
 PRESENTATION-GUIDE.md
 .github/copilot-instructions.md
 

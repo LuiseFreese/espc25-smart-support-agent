@@ -1,6 +1,6 @@
 # Demo Overview: Azure AI Foundry Smart Support Agent
 
-This document provides a comprehensive overview of all demos in this repository, including their purpose, Azure resources used, and validation status.
+Technical reference for all demos in this repository. For presentation guidance, see [SESSION-STORYLINE.md](SESSION-STORYLINE.md).
 
 ## Resource Overview
 
@@ -13,6 +13,7 @@ All demos share the following production resources in resource group `rg-smart-a
 | Azure OpenAI | `oai-agents-dw7z4hg4ssn2k` | GPT-4o-mini & text-embedding-3-large models |
 | Azure AI Search | `srch-agents-dw7z4hg4ssn2k` | Knowledge base index with vector embeddings |
 | Storage Account | `stagentsdw7z4hg4ssn2k` | Table Storage for tickets, blob for KB files |
+| Communication Services | `commserv-agents-dw7z4hg4ssn2k` | Email sending (auto-replies) |
 | Application Insights | `appi-smart-agents-dw7z4hg4ssn2k` | Monitoring and logging |
 | Key Vault | `kv-agents-dw7z4hg4ssn2k` | Secrets management |
 | AI Hub | `aihub-agents-dw7z4hg4ssn2k` | AI Foundry workspace parent |
@@ -200,7 +201,8 @@ Demonstrate **event-driven production system** for automated email support using
 | Resource | Usage |
 |----------|-------|
 | **Function App** (`func-agents-dw7z4hg4ssn2k`) | Email processing, webhooks, triage, ticket creation |
-| **Microsoft Graph API** | Email monitoring, auto-reply, forwarding |
+| **Microsoft Graph API** | Email monitoring (reading emails only) |
+| **Azure Communication Services** (`commserv-agents-*`) | Auto-reply email sending |
 | **Azure OpenAI** (`gpt-4o-mini`) | Keyword-based triage classification |
 | **RAG Function** (`func-rag-dw7z4hg4ssn2k`) | Knowledge base search |
 | **Table Storage** (`SupportTickets` table) | Ticket persistence with deduplication |
@@ -216,14 +218,14 @@ Demonstrate **event-driven production system** for automated email support using
 - **Infinite loop prevention**: Self-email filter
 
 ### Validation Status
-✅ **PRODUCTION READY** - Fully tested and documented
+**PRODUCTION READY** - Fully tested and documented
 - **Test Date**: November 14, 2025
 - **Webhook**: Active subscription (expires Nov 17, 2025)
 - **Monitored Inbox**: `YOUR_SUPPORT_EMAIL@yourdomain.com`
 
 ### Test Results
 
-#### Automated Tests ✅
+#### Automated Tests
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
@@ -246,7 +248,7 @@ Demonstrate **event-driven production system** for automated email support using
 }
 ```
 
-#### Manual Tests Required 📧
+#### Manual Tests Required
 - Send real email to `YOUR_SUPPORT_EMAIL@yourdomain.com` to test:
   - Webhook notification (instant processing)
   - Auto-reply vs escalation based on confidence
@@ -283,7 +285,7 @@ graph TB
     G -->|Classification| H[RAG Search<br/>Python Function]
     H -->|Answer + Confidence| I[(Table Storage<br/>Create Ticket)]
     I -->|Confidence| J{High ≥0.7?}
-    J -->|Yes| K[Auto-Reply<br/>to Customer]
+    J -->|Yes| K[Auto-Reply via<br/>Communication Services]
     J -->|No| L[Forward to<br/>Support Team]
     K --> M[Mark as Read]
     L --> M
@@ -305,10 +307,11 @@ graph TB
 | Azure OpenAI | Standard | ~$50/month (50K requests) |
 | Azure AI Search | Standard S1 | ~$250/month |
 | Function Apps (2x) | Consumption Plan | ~$10/month |
+| Communication Services | Pay-per-email | ~$1/month (10K emails) |
 | Storage Account | Standard LRS | ~$5/month |
 | Application Insights | Pay-as-you-go | ~$10/month |
 | Key Vault | Standard | ~$5/month |
-| **Total** | | **~$330/month** |
+| **Total** | | **~$331/month** |
 
 ### Cost Optimization Tips
 - Use Azure OpenAI PTU for predictable costs at scale

@@ -16,9 +16,11 @@ This repository demonstrates building an **autonomous IT support agent** using A
 ## Key Architecture Concepts
 
 - **Event-Driven:** Microsoft Graph webhooks for instant email processing
+- **Hybrid Email:** Graph API for reading, Azure Communication Services for sending
 - **Keyword Triage:** Fast, deterministic classification (Network, Access, Billing, Software)
 - **RAG with Confidence:** Azure AI Search semantic ranking maps to confidence scores (0.1-0.95)
 - **Table Storage:** All tickets persisted with unique IDs (TKT-YYYYMMDD-XXXXXX)
+- **Duplicate Prevention:** EmailMessageId as RowKey enforces uniqueness
 - **Infrastructure as Code:** Bicep templates for all Azure resources
     subgraph "Event-Driven Production Flow"
         A[New Email Arrives] -->|Real-time| B[Microsoft Graph<br/>Change Notification]
@@ -120,23 +122,30 @@ func start
 func azure functionapp publish func-agents-dw7z4hg4ssn2k
 ```
 
-### Testing
-
-Send test emails to your support address (configured in Graph webhook setup). See `tests/TEST-EMAIL-SCENARIOS.md` for examples.
-
 ### Deployment
-
 ```bash
 # Deploy infrastructure
+cd infra
 az deployment sub create \
-  --location swedencentral \
-  --template-file infra/main.bicep \
-  --parameters @infra/parameters.dev.json
+  --location westeurope \
+  --template-file main.bicep \
+  --parameters @parameters.dev.json
+
+# Link Communication Services domain (REQUIRED)
+cd ..\scripts
+.\post-deploy-communication-services.ps1 -ResourceGroup rg-smart-agents-dev
+
+# Configure Graph webhook (auto-configures RAG_API_KEY!)
+.\setup-graph-webhook.ps1 -ResourceGroup rg-smart-agents-dev -SupportEmail support@domain.com
 
 # Deploy function code
-cd demos/04-real-ticket-creation/function
+cd ..\demos\04-real-ticket-creation\function
 npm install && npm run build
-func azure functionapp publish <function-app-name>
+func azure functionapp publish func-agents-<uniqueid>
+
+# Verify deployment
+cd ..\..\scripts
+.\verify-deployment.ps1 -ResourceGroup rg-smart-agents-dev
 ```
 
 ## Common Development Tasks
@@ -153,15 +162,22 @@ func azure functionapp publish <function-app-name>
 
 | Issue | Solution |
 |-------|----------|
+| No email response received | 1. Check domain linked: `.\scripts\post-deploy-communication-services.ps1`<br>2. Check RAG_API_KEY configured: `az functionapp config appsettings list --name func-agents-<id> --query "[?name=='RAG_API_KEY']"`<br>3. View logs in Application Insights |
+| RAG returns low confidence (0.3) | RAG_API_KEY missing or incorrect. Re-run `.\scripts\setup-graph-webhook.ps1` |
+| "DomainNotLinked" error | Run `.\scripts\post-deploy-communication-services.ps1` to link email domain |
+| Multiple duplicate emails | Verify EmailMessageId deduplication logic deployed (latest function code) |
 | Webhook not processing emails | Check subscription status: GET `/api/managesubscription`, renew if expired |
 | TypeScript errors | Run `npm run build` locally first |
 | Missing environment variables | Check function app settings: `az functionapp config appsettings list` |
-| Infinite email loop | Verify self-email filter active in `GraphWebhook.ts` |
 
 ## Important Notes
 
-- Webhook subscriptions expire every 3 days (must renew)
-- GraphWebhook uses `authLevel: 'anonymous'` (required for Microsoft Graph validation)
-- All other endpoints use `authLevel: 'function'` (requires function key)
-- Use Managed Identity for Azure resource access (no API keys)
+- **Communication Services for Email:** System uses Azure Communication Services for email sending (not Graph API sendMail) to ensure compatibility with all M365 tenants
+- **Domain Linking Required:** Communication Services domain must be linked via `post-deploy-communication-services.ps1` after Bicep deployment
+- **RAG Authentication:** RAG_API_KEY must be configured or RAG returns fallback (0.3 confidence). Setup script now handles this automatically
+- **Duplicate Prevention:** EmailMessageId used as Table Storage RowKey enforces uniqueness
+- **Webhook Expiration:** Subscriptions expire every 3 days (must renew)
+- **GraphWebhook Auth:** Uses `authLevel: 'anonymous'` (required for Microsoft Graph validation)
+- **Other Endpoints:** Use `authLevel: 'function'` (requires function key)
+- **Managed Identity:** Use for Azure resource access (no API keys)
 

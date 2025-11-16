@@ -92,7 +92,7 @@ export class AIService {
         question: question  // RAG function expects 'question' not 'query'
       }, {
         headers,
-        timeout: 30000
+        timeout: 90000  // Increased to 90s for RAG search
       });
 
       return {

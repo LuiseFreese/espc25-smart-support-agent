@@ -128,51 +128,45 @@ export async function GraphWebhook(
         context.log(`Generated ticket ID: ${ticketId}`);
 
         // Step 4: Create ticket in Table Storage
-        const rowKey = await storageService.createTicket({
-          Title: email.subject,
-          Description: emailBody,
-          Status: 'New',
-          Priority: triage.priority,
-          Category: triage.category,
-          CustomerEmail: customerEmail,
-          AIResponse: rag.answer,
-          TicketID: ticketId,
-          Confidence: rag.confidence,
-          EmailMessageId: messageId
-        });
-        context.log(`✅ Ticket created: ${ticketId}`);
-
-        // Step 5: Send response or forward based on confidence
-        if (rag.confidence >= 0.7) {
-          // High confidence - auto-reply
-          context.log('Sending auto-reply (high confidence)...');
-          await graphService.sendReply(
-            customerEmail,
-            email.subject,
-            rag.answer,
-            ticketId
-          );
-          await storageService.updateTicketStatus(rowKey, 'AI Resolved - Awaiting Confirmation');
-          context.log('✅ Auto-reply sent');
-        } else {
-          // Low confidence - forward to support team
-          context.log('Forwarding to support team (low confidence)...');
-          const supportTeamEmail = process.env.SUPPORT_TEAM_EMAIL || customerEmail;
-
-          await graphService.forwardToSupport(
-            supportTeamEmail,
-            email.subject,
-            ticketId,
-            triage.category,
-            triage.priority,
-            rag.confidence,
-            customerEmail,
-            emailBody,
-            rag.answer
-          );
-          await storageService.updateTicketStatus(rowKey, 'Needs Human Review');
-          context.log('✅ Forwarded to support team');
+        let rowKey: string;
+        try {
+          rowKey = await storageService.createTicket({
+            Title: email.subject,
+            Description: emailBody,
+            Status: 'New',
+            Priority: triage.priority,
+            Category: triage.category,
+            CustomerEmail: customerEmail,
+            AIResponse: rag.answer,
+            TicketID: ticketId,
+            Confidence: rag.confidence,
+            EmailMessageId: messageId
+          });
+          context.log(`✅ Ticket created: ${ticketId}`);
+        } catch (error: any) {
+          // If ticket already exists (409 Conflict), this is a duplicate webhook notification
+          if (error?.statusCode === 409 || error?.code === 'EntityAlreadyExists') {
+            context.log(`ℹ️ Ticket already exists for message ${messageId} - skipping duplicate webhook`);
+            continue;
+          }
+          throw error;  // Re-throw other errors
         }
+
+        // Step 5: Send auto-reply (always for demo)
+        context.log(`Sending auto-reply (confidence: ${rag.confidence})...`);
+        await graphService.sendReply(
+          customerEmail,
+          email.subject,
+          rag.answer,
+          ticketId
+        );
+        
+        // Update ticket status based on confidence
+        const status = rag.confidence >= 0.7 
+          ? 'AI Resolved - Awaiting Confirmation'
+          : 'AI Resolved - Low Confidence';
+        await storageService.updateTicketStatus(rowKey, status);
+        context.log(`✅ Auto-reply sent (confidence: ${rag.confidence})`);
 
         // Mark email as read
         await graphService.markAsRead(messageId);

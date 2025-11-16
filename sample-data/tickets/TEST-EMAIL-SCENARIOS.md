@@ -169,5 +169,5 @@ az monitor app-insights query \
 
 - `ADDITIONAL-EMAIL-SCENARIOS.md` - 8 more test scenarios (Software, Access, Network, Other)
 - `docs/WEBHOOK-MANAGEMENT.md` - Complete webhook subscription guide
-- `.github/copilot-instructions.md` - Full project documentation
+
 

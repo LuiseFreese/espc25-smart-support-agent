@@ -63,8 +63,20 @@ Write-Host "✓ Permissions added" -ForegroundColor Green
 # Step 4: Grant Admin Consent
 Write-Host "`n[Step 4/7] Granting Admin Consent..." -ForegroundColor Yellow
 Write-Host "⚠️  You need Global Administrator privileges for this step" -ForegroundColor Yellow
-az ad app permission admin-consent --id $appId
-Write-Host "✓ Admin consent granted" -ForegroundColor Green
+
+try {
+    az ad app permission admin-consent --id $appId 2>&1 | Out-Null
+    Write-Host "✓ Admin consent granted" -ForegroundColor Green
+    Write-Host "  Waiting 30 seconds for permissions to propagate..." -ForegroundColor Gray
+    Start-Sleep -Seconds 30
+} catch {
+    Write-Host "⚠️  Admin consent may have failed. Manual approval might be needed:" -ForegroundColor Yellow
+    Write-Host "  1. Go to Azure Portal > App Registrations > $AppName" -ForegroundColor Gray
+    Write-Host "  2. Navigate to 'API permissions'" -ForegroundColor Gray
+    Write-Host "  3. Click 'Grant admin consent for <tenant>'" -ForegroundColor Gray
+    Write-Host "  Continuing anyway..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 5
+}
 
 # Step 5: Create Client Secret
 Write-Host "`n[Step 5/7] Creating Client Secret..." -ForegroundColor Yellow
@@ -104,6 +116,23 @@ if ($appInsights) {
     $appInsightsKey = ""
 }
 
+# Get Communication Services connection string
+$commServices = az resource list --resource-group $ResourceGroup --resource-type "Microsoft.Communication/communicationServices" --query "[0].name" -o tsv
+if ($commServices) {
+    $commConnectionString = az communication list-key --name $commServices --resource-group $ResourceGroup --query "primaryConnectionString" -o tsv
+    # Get sender address from deployment outputs (will be set after infrastructure deployment)
+    $commSenderAddress = az deployment group show --name communicationServicesDeployment --resource-group $ResourceGroup --query "properties.outputs.senderAddress.value" -o tsv 2>$null
+    if (-not $commSenderAddress) {
+        # Fallback: construct default Azure-managed domain sender
+        $commSenderAddress = "donotreply@[azure-managed-domain]"
+    }
+    Write-Host "  Found Communication Services: $commServices" -ForegroundColor Gray
+} else {
+    Write-Host "⚠️  No Communication Services found. Email sending will not work." -ForegroundColor Yellow
+    $commConnectionString = ""
+    $commSenderAddress = ""
+}
+
 # Build settings array
 $settings = @(
     "GRAPH_CLIENT_ID=$appId",
@@ -121,6 +150,33 @@ if ($appInsightsKey) {
     $settings += "APPINSIGHTS_INSTRUMENTATIONKEY=$appInsightsKey"
 }
 
+if ($commConnectionString) {
+    $settings += "COMMUNICATION_SERVICES_CONNECTION_STRING=$commConnectionString"
+    $settings += "COMMUNICATION_SERVICES_SENDER_ADDRESS=$commSenderAddress"
+}
+
+# Get RAG function key (critical for RAG authentication)
+$ragFunctionApp = az functionapp list `
+    --resource-group $ResourceGroup `
+    --query "[?contains(name, 'func-rag')].name" -o tsv | Select-Object -First 1
+
+$ragApiKey = $null
+if ($ragFunctionApp) {
+    $ragApiKey = az functionapp keys list `
+        --name $ragFunctionApp `
+        --resource-group $ResourceGroup `
+        --query "functionKeys.default" -o tsv 2>$null
+    
+    if ($ragApiKey) {
+        $settings += "RAG_API_KEY=$ragApiKey"
+        Write-Host "  Found RAG function: $ragFunctionApp" -ForegroundColor Gray
+    } else {
+        Write-Host "⚠️  Could not get RAG function key - RAG may return fallback responses" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "⚠️  RAG function app not found - RAG may return fallback responses" -ForegroundColor Yellow
+}
+
 az functionapp config appsettings set `
     --name $functionAppName `
     --resource-group $ResourceGroup `
@@ -134,8 +190,15 @@ Write-Host "  - STORAGE_ACCOUNT_NAME: $storageAccount" -ForegroundColor Gray
 if ($ragEndpoint) {
     Write-Host "  - RAG_ENDPOINT: $ragEndpoint" -ForegroundColor Gray
 }
+if ($ragApiKey) {
+    Write-Host "  - RAG_API_KEY: [configured] ⭐" -ForegroundColor Gray
+}
 if ($appInsightsKey) {
     Write-Host "  - APPINSIGHTS_INSTRUMENTATIONKEY: [configured]" -ForegroundColor Gray
+}
+if ($commConnectionString) {
+    Write-Host "  - COMMUNICATION_SERVICES_CONNECTION_STRING: [configured]" -ForegroundColor Gray
+    Write-Host "  - COMMUNICATION_SERVICES_SENDER_ADDRESS: $commSenderAddress" -ForegroundColor Gray
 }
 
 # Step 7: Create Webhook Subscription

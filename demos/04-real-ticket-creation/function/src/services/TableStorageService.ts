@@ -66,8 +66,11 @@ export class TableStorageService {
     try {
       await this.initialize();
 
-      // Generate unique row key from timestamp + random string
-      const rowKey = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      // Use EmailMessageId as rowKey for automatic deduplication
+      // If the same email triggers multiple webhooks, Table Storage will reject duplicates with 409 Conflict
+      const rowKey = ticket.EmailMessageId 
+        ? ticket.EmailMessageId.replace(/[^a-zA-Z0-9-]/g, '_')  // Sanitize for Table Storage
+        : `${Date.now()}-${Math.random().toString(36).substring(7)}`;  // Fallback for non-email tickets
 
       // Table Storage entity - partitionKey groups related entities
       // We use 'TICKET' as partition for all tickets
@@ -83,7 +86,7 @@ export class TableStorageService {
         AIResponse: ticket.AIResponse,
         TicketID: ticket.TicketID,
         Confidence: ticket.Confidence,
-        EmailMessageId: ticket.EmailMessageId || '',  // Store email ID for deduplication
+        EmailMessageId: ticket.EmailMessageId || '',  // Store email ID for reference
         CreatedAt: new Date().toISOString()
       };
 

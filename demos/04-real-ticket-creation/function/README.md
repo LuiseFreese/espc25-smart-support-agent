@@ -30,7 +30,7 @@ flowchart TD
     E --> E1["TKT-YYYYMMDD-XXXXXX<br/>+ Metadata"]
     
     E1 --> F{Confidence ≥ 0.7?}
-    F -->|Yes| G[Auto-Reply<br/>to Customer]
+    F -->|Yes| G[Auto-Reply via<br/>Communication Services]
     F -->|No| H[Escalate<br/>to Human]
     
     G & H --> I[Log to<br/>App Insights]
@@ -99,11 +99,6 @@ flowchart TD
 - **Returns:** Test ticket ID if storage is working
 - **Use Case:** Quick health check for monitoring/alerts
 
-**5. CheckMailboxTimer** (DISABLED - Legacy)
-- **Status:** Disabled due to infinite loop risk
-- **Original Purpose:** Poll mailbox every 5 minutes for new emails
-- **Why Disabled:** Caused emails to be processed multiple times; replaced by event-driven GraphWebhook
-
 ### Azure Table Storage (\stagents*\)
 
 **Purpose:** Persistent NoSQL storage for support tickets
@@ -146,14 +141,15 @@ if (duplicate) return; // Skip processing
 
 ### Microsoft Graph API (M365 Integration)
 
-**Purpose:** Read emails and send auto-replies
+**Purpose:** Read incoming support emails via webhook notifications
 
 **Authentication:** App Registration with Application Permissions
 
 **Required Permissions (admin consent required):**
-- \Mail.Read\ - Read all mailboxes
-- \Mail.Send\ - Send mail as any user
-- \User.Read.All\ - Read user profiles
+- `Mail.Read` - Read all mailboxes
+- `User.Read.All` - Read user profiles
+
+**Note:** Email sending is handled by Azure Communication Services (see below), not Graph API
 
 **Webhook Subscription:**
 - **Resource:** \/users/{email}/mailFolders/Inbox/messages\
@@ -168,12 +164,41 @@ if (duplicate) return; // Skip processing
 3. Graph POSTs notification to GraphWebhook function: \{"\u0040odata.type":"#Microsoft.Graph.ChangeNotification","resource":"..."}\
 4. Function validates clientState, fetches email details, processes
 
-**Why Webhook vs Polling:**
-- **Latency:** Instant (<2s) vs 5-minute delay
-- **Cost:** Pay only when email arrives vs continuous polling
-- **Reliability:** No missed emails during downtime
+### Azure Communication Services (`commserv-agents-*`)
 
-### Python RAG Function (\unc-rag-*\)
+**Purpose:** Send auto-reply emails to customers
+
+**Why Communication Services (vs Graph API `Mail.Send`):**
+- **Tenant Compatibility:** Works across all M365 tenants without special permissions
+- **No Admin Consent:** Doesn't require `Mail.Send` application permission
+- **Reliable Delivery:** Purpose-built for transactional email
+- **Cost Effective:** Pay-per-email pricing (~$0.0001 per email)
+
+**Domain Configuration:**
+- Uses **AzureManagedDomain** (automatic domain provided by Azure)
+- Domain must be **linked** to Communication Services resource (done via `deploy.ps1`)
+- Sender address: `DoNotReply@<your-azurecomm-domain>.azurecomm.net`
+
+**How It's Used:**
+```typescript
+// EmailService.ts
+const emailClient = new EmailClient(connectionString);
+const message = {
+  senderAddress: "DoNotReply@azurecomm.net",
+  recipients: { to: [{ address: customerEmail }] },
+  content: {
+    subject: `Re: ${ticketTitle}`,
+    plainText: aiResponse
+  }
+};
+await emailClient.beginSend(message);
+```
+
+**Configuration Required:**
+- `COMMUNICATION_SERVICES_CONNECTION_STRING` - Connection string from Azure Portal
+- Domain linking via Azure CLI (automated in deployment scripts)
+
+### Python RAG Function (`func-rag-*`)
 
 **Purpose:** Semantic search and answer generation
 
@@ -251,13 +276,14 @@ requests
 All environment variables are configured in Function App Settings (see main [README.md](../../../README.md) for deployment):
 
 **Required:**
-- \GRAPH_CLIENT_ID\, \GRAPH_CLIENT_SECRET\, \GRAPH_TENANT_ID\ - App registration credentials
-- \SUPPORT_EMAIL\ - Monitored mailbox address
-- \STORAGE_ACCOUNT_NAME\, \STORAGE_ACCOUNT_KEY\ - Table Storage connection
-- \RAG_ENDPOINT\, \RAG_API_KEY\ - RAG function endpoint
+- `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `GRAPH_TENANT_ID` - App registration credentials (reading emails)
+- `COMMUNICATION_SERVICES_CONNECTION_STRING` - Azure Communication Services (sending emails)
+- `SUPPORT_EMAIL` - Monitored mailbox address
+- `STORAGE_ACCOUNT_NAME`, `STORAGE_ACCOUNT_KEY` - Table Storage connection
+- `RAG_ENDPOINT`, `RAG_API_KEY` - RAG function endpoint
 
 **Optional:**
-- \APPINSIGHTS_CONNECTION_STRING\ - Monitoring (auto-configured via Bicep)
+- `APPINSIGHTS_CONNECTION_STRING` - Monitoring (auto-configured via Bicep)
 
 ## Next Steps
 

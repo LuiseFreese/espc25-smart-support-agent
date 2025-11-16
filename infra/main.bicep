@@ -40,6 +40,7 @@ var keyVaultName = 'kv-agents-${resourceSuffix}'
 var openAIName = 'oai-agents-${resourceSuffix}'
 var aiHubName = 'aihub-agents-${resourceSuffix}'
 var aiProjectName = 'aiproject-agents-${resourceSuffix}'
+var communicationServicesName = 'comm-agents-${resourceSuffix}'
 
 // Resource Group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
@@ -171,6 +172,17 @@ module openAI 'modules/openai.bicep' = {
   }
 }
 
+// Azure Communication Services for email sending
+module communicationServices 'modules/communication-services.bicep' = {
+  name: 'communicationServicesDeployment'
+  scope: resourceGroup
+  params: {
+    name: communicationServicesName
+    location: location
+    dataLocation: 'United States'
+  }
+}
+
 // Role Assignments - Grant Function App Managed Identity access to resources
 module roleAssignments 'modules/role-assignments.bicep' = {
   name: 'roleAssignmentsDeployment'
@@ -205,3 +217,6 @@ output aiHubName string = aiHub.outputs.name
 output aiHubId string = aiHub.outputs.id
 output aiProjectName string = aiProject.outputs.name
 output aiProjectId string = aiProject.outputs.id
+output communicationServicesName string = communicationServices.outputs.communicationServicesName
+output communicationServicesSenderAddress string = communicationServices.outputs.senderAddress
+output communicationServicesConnectionString string = communicationServices.outputs.connectionString

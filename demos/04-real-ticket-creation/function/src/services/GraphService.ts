@@ -1,14 +1,31 @@
 import { Client } from '@microsoft/microsoft-graph-client';
+import { EmailClient, KnownEmailSendStatus } from '@azure/communication-email';
 import { createGraphClient } from '../lib/graphClient';
 import { EmailMessage } from '../models/Ticket';
 
 export class GraphService {
   private client: Client;
+  private emailClient: EmailClient | null;
   private supportEmail: string;
+  private communicationSenderAddress: string;
 
   constructor() {
     this.supportEmail = process.env.SUPPORT_EMAIL_ADDRESS || '';
     this.client = createGraphClient();
+    
+    // Initialize Azure Communication Services Email client if connection string is available
+    const commConnectionString = process.env.COMMUNICATION_SERVICES_CONNECTION_STRING;
+    const commSenderAddress = process.env.COMMUNICATION_SERVICES_SENDER_ADDRESS;
+    
+    if (commConnectionString && commSenderAddress) {
+      this.emailClient = new EmailClient(commConnectionString);
+      this.communicationSenderAddress = commSenderAddress;
+      console.log('✅ Using Azure Communication Services for email sending');
+    } else {
+      this.emailClient = null;
+      this.communicationSenderAddress = '';
+      console.warn('⚠️ Azure Communication Services not configured - email sending will fail');
+    }
   }
 
   async getUnreadEmails(): Promise<EmailMessage[]> {
@@ -58,13 +75,16 @@ export class GraphService {
     body: string,
     ticketId: string
   ): Promise<void> {
-    try {
-      const message = {
-        message: {
-          subject: `Re: ${subject}`,
-          body: {
-            contentType: 'HTML',
-            content: `
+    // Use Azure Communication Services for sending (works in all tenants)
+    if (this.emailClient && this.communicationSenderAddress) {
+      try {
+        console.log(`Sending email via Azure Communication Services to ${to}...`);
+        
+        const emailMessage = {
+          senderAddress: this.communicationSenderAddress,
+          content: {
+            subject: `Re: ${subject}`,
+            html: `
               <p>Hello,</p>
               <p>We've received your support request and created ticket <strong>${ticketId}</strong>.</p>
               <p><strong>Based on our knowledge base:</strong></p>
@@ -74,22 +94,28 @@ export class GraphService {
               <p>Best regards,<br>Support Team</p>
             `
           },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: to
-              }
-            }
-          ]
-        }
-      };
+          recipients: {
+            to: [{ address: to }]
+          }
+        };
 
-      await this.client
-        .api(`/users/${this.supportEmail}/sendMail`)
-        .post(message);
-    } catch (error) {
-      console.error('Failed to send email:', error);
-      throw error;
+        const poller = await this.emailClient.beginSend(emailMessage);
+        const result = await poller.pollUntilDone();
+        
+        if (result.status === KnownEmailSendStatus.Succeeded) {
+          console.log(`✅ Email sent successfully via Azure Communication Services (ID: ${result.id})`);
+        } else {
+          console.error(`⚠️ Email send status: ${result.status}`);
+          throw new Error(`Email send failed with status: ${result.status}`);
+        }
+        
+      } catch (error: any) {
+        console.error('❌ Failed to send email via Azure Communication Services:', error);
+        throw new Error(`Communication Services error: ${error.message || 'Unknown error'}`);
+      }
+    } else {
+      // Fallback error (Communication Services should always be configured)
+      throw new Error('Azure Communication Services not configured. Cannot send email.');
     }
   }
 
