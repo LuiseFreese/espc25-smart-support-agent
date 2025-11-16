@@ -22,7 +22,6 @@ interface Document {
   id: string;
   title: string;
   content: string;
-  url: string;
   vector?: number[];
 }
 
@@ -36,7 +35,6 @@ async function createSearchIndex(): Promise<void> {
       { name: 'id', type: 'Edm.String', key: true, searchable: false },
       { name: 'title', type: 'Edm.String', searchable: true, filterable: true },
       { name: 'content', type: 'Edm.String', searchable: true },
-      { name: 'url', type: 'Edm.String', searchable: false, filterable: true },
       {
         name: 'vector',
         type: 'Collection(Edm.Single)',
@@ -109,7 +107,7 @@ async function getEmbedding(text: string): Promise<number[]> {
     throw new Error(`Embedding API error: ${error}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { data: Array<{ embedding: number[] }> };
   return data.data[0].embedding;
 }
 
@@ -154,7 +152,6 @@ function readMarkdownFiles(dirPath: string): Document[] {
           id: `${title}-${idx}`,
           title,
           content: chunk,
-          url: `kb/${file}`,
         });
       });
     }
@@ -169,11 +166,32 @@ async function uploadDocuments(documents: Document[]): Promise<void> {
 
   console.log(`📄 Processing ${documents.length} document chunks...`);
 
-  // Add embeddings to documents
+  // Add embeddings to documents with rate limiting
   for (let i = 0; i < documents.length; i++) {
     const doc = documents[i];
     console.log(`  [${i + 1}/${documents.length}] Generating embedding for: ${doc.id}`);
-    doc.vector = await getEmbedding(doc.content);
+    
+    let retries = 0;
+    const maxRetries = 5;
+    while (retries < maxRetries) {
+      try {
+        doc.vector = await getEmbedding(doc.content);
+        // Add delay between requests to avoid rate limits (S0 tier)
+        if (i < documents.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+        }
+        break;
+      } catch (error: any) {
+        if (error.message.includes('RateLimitReached')) {
+          retries++;
+          const waitTime = 60;
+          console.log(`  ⏳ Rate limit hit, waiting ${waitTime} seconds (retry ${retries}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+        } else {
+          throw error;
+        }
+      }
+    }
   }
 
   // Upload in batches
@@ -206,6 +224,10 @@ async function main() {
     console.error(`❌ Directory not found: ${contentDir}`);
     process.exit(1);
   }
+
+  // Create or update search index
+  console.log('📋 Creating search index...');
+  await createSearchIndex();
 
   console.log(`📂 Reading documents from: ${contentDir}`);
   const documents = readMarkdownFiles(contentDir);

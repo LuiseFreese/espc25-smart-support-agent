@@ -92,7 +92,7 @@ except Exception as e:
 
 # Read and embed documents
 print("\nReading knowledge base documents...")
-docs_path = "demos/02-rag-search/content"
+docs_path = "content"
 documents = []
 
 import os

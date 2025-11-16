@@ -35,6 +35,7 @@ var storageAccountName = 'stagents${take(resourceSuffix, 16)}'
 var logAnalyticsName = 'log-smart-agents-${resourceSuffix}'
 var appInsightsName = 'appi-smart-agents-${resourceSuffix}'
 var functionAppName = 'func-agents-${resourceSuffix}'
+var ragFunctionAppName = 'func-rag-${resourceSuffix}'
 var hostingPlanName = 'plan-agents-${resourceSuffix}'
 var keyVaultName = 'kv-agents-${resourceSuffix}'
 var openAIName = 'oai-agents-${resourceSuffix}'
@@ -101,7 +102,7 @@ module hostingPlan 'modules/hosting-plan.bicep' = {
   }
 }
 
-// Function App
+// Function App (Main - Demo 04)
 module functionApp 'modules/function-app.bicep' = {
   name: 'functionAppDeployment'
   scope: resourceGroup
@@ -116,6 +117,29 @@ module functionApp 'modules/function-app.bicep' = {
     graphClientId: graphClientId
     graphClientSecret: graphClientSecret
     graphTenantId: graphTenantId
+    runtime: 'node'
+  }
+  dependsOn: [
+    storageAccount
+  ]
+}
+
+// RAG Function App (Demo 02)
+module ragFunctionApp 'modules/function-app.bicep' = {
+  name: 'ragFunctionAppDeployment'
+  scope: resourceGroup
+  params: {
+    name: ragFunctionAppName
+    location: location
+    hostingPlanId: hostingPlan.outputs.planId
+    storageAccountName: storageAccountName
+    appInsightsConnectionString: appInsights.outputs.connectionString
+    openAIEndpoint: openAI.outputs.endpoint
+    searchEndpoint: searchService.outputs.endpoint
+    graphClientId: ''
+    graphClientSecret: ''
+    graphTenantId: ''
+    runtime: 'python'
   }
   dependsOn: [
     storageAccount
@@ -183,12 +207,25 @@ module communicationServices 'modules/communication-services.bicep' = {
   }
 }
 
-// Role Assignments - Grant Function App Managed Identity access to resources
+// Role Assignments - Grant Function Apps Managed Identity access to resources
 module roleAssignments 'modules/role-assignments.bicep' = {
   name: 'roleAssignmentsDeployment'
   scope: resourceGroup
   params: {
     functionAppPrincipalId: functionApp.outputs.principalId
+    openAIAccountName: openAIName
+    searchServiceName: searchServiceName
+    keyVaultName: keyVaultName
+    userObjectId: currentUserObjectId
+    createRoleAssignments: createRoleAssignments
+  }
+}
+
+module ragRoleAssignments 'modules/role-assignments.bicep' = {
+  name: 'ragRoleAssignmentsDeployment'
+  scope: resourceGroup
+  params: {
+    functionAppPrincipalId: ragFunctionApp.outputs.principalId
     openAIAccountName: openAIName
     searchServiceName: searchServiceName
     keyVaultName: keyVaultName
@@ -206,7 +243,9 @@ output storageAccountName string = storageAccountName
 output storageConnectionString string = storageAccount.outputs.connectionString
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output functionAppName string = functionAppName
+output ragFunctionAppName string = ragFunctionAppName
 output functionAppUrl string = functionApp.outputs.functionAppUrl
+output ragFunctionAppUrl string = ragFunctionApp.outputs.functionAppUrl
 output keyVaultName string = keyVaultName
 output keyVaultUri string = keyVault.outputs.vaultUri
 output openAIEndpoint string = openAI.outputs.endpoint

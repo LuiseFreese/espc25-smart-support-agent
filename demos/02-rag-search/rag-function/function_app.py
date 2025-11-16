@@ -13,15 +13,23 @@ app = func.FunctionApp()
 search_endpoint = os.getenv("AZURE_AI_SEARCH_ENDPOINT")
 search_key = os.getenv("AZURE_AI_SEARCH_API_KEY")
 index_name = os.getenv("AZURE_AI_SEARCH_INDEX", "kb-support")
+openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
-credential = DefaultAzureCredential()
-token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-
-openai_client = AzureOpenAI(
-    azure_ad_token_provider=token_provider,
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-)
+# Use API key if provided, otherwise fall back to Managed Identity
+if openai_api_key:
+    openai_client = AzureOpenAI(
+        api_key=openai_api_key,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
+else:
+    credential = DefaultAzureCredential()
+    token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+    openai_client = AzureOpenAI(
+        azure_ad_token_provider=token_provider,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
 
 search_client = SearchClient(
     search_endpoint,

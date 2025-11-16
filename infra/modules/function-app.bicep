@@ -9,6 +9,8 @@ param graphClientId string = ''
 @secure()
 param graphClientSecret string = ''
 param graphTenantId string = ''
+@allowed(['node', 'python'])
+param runtime string = 'node'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageAccountName
@@ -24,69 +26,65 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   properties: {
     serverFarmId: hostingPlanId
     siteConfig: {
-      linuxFxVersion: 'NODE|20'
-      appSettings: [
-        {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-        }
-        {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~4'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'node'
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~20'
-        }
-        {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsightsConnectionString
-        }
-        {
-          name: 'AZURE_OPENAI_ENDPOINT'
-          value: openAIEndpoint
-        }
-        {
-          name: 'AZURE_AI_SEARCH_ENDPOINT'
-          value: searchEndpoint
-        }
-        {
-          name: 'AZURE_CLIENT_ID'
-          value: 'system'
-        }
-        {
-          name: 'STORAGE_ACCOUNT_NAME'
-          value: storageAccount.name
-        }
-        {
-          name: 'STORAGE_ACCOUNT_KEY'
-          value: storageAccount.listKeys().keys[0].value
-        }
-        {
-          name: 'GRAPH_CLIENT_ID'
-          value: graphClientId
-        }
-        {
-          name: 'GRAPH_CLIENT_SECRET'
-          value: graphClientSecret
-        }
-        {
-          name: 'GRAPH_TENANT_ID'
-          value: graphTenantId
-        }
-        {
-          name: 'RAG_ENDPOINT'
-          value: 'https://func-rag-dw7z4hg4ssn2k.azurewebsites.net/api/rag-search'
-        }
-        {
-          name: 'TRIAGE_ENDPOINT'
-          value: 'https://triage-endpoint.eastus.inference.ml.azure.com/score'
-        }
-      ]
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|3.11' : 'NODE|20'
+      appSettings: concat(
+        [
+          {
+            name: 'AzureWebJobsStorage'
+            value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+          }
+          {
+            name: 'FUNCTIONS_EXTENSION_VERSION'
+            value: '~4'
+          }
+          {
+            name: 'FUNCTIONS_WORKER_RUNTIME'
+            value: runtime
+          }
+          {
+            name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+            value: appInsightsConnectionString
+          }
+          {
+            name: 'AZURE_OPENAI_ENDPOINT'
+            value: openAIEndpoint
+          }
+          {
+            name: 'AZURE_AI_SEARCH_ENDPOINT'
+            value: searchEndpoint
+          }
+          {
+            name: 'AZURE_CLIENT_ID'
+            value: 'system'
+          }
+          {
+            name: 'STORAGE_ACCOUNT_NAME'
+            value: storageAccount.name
+          }
+          {
+            name: 'STORAGE_ACCOUNT_KEY'
+            value: storageAccount.listKeys().keys[0].value
+          }
+          {
+            name: 'GRAPH_CLIENT_ID'
+            value: graphClientId
+          }
+          {
+            name: 'GRAPH_CLIENT_SECRET'
+            value: graphClientSecret
+          }
+          {
+            name: 'GRAPH_TENANT_ID'
+            value: graphTenantId
+          }
+        ],
+        runtime == 'node' ? [
+          {
+            name: 'WEBSITE_NODE_DEFAULT_VERSION'
+            value: '~20'
+          }
+        ] : []
+      )
       cors: {
         allowedOrigins: ['*']
       }

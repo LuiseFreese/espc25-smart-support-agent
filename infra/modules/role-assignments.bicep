@@ -60,6 +60,30 @@ resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
+// Grant user access to Azure OpenAI (for local development/KB ingestion)
+resource userOpenAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(userObjectId)) {
+  name: guid(openAIAccount.id, userObjectId, cognitiveServicesOpenAIUserRoleId)
+  scope: openAIAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: userObjectId
+    principalType: 'User'
+    description: 'Allows user to call Azure OpenAI for KB ingestion and local development'
+  }
+}
+
+// Grant user access to Azure AI Search (for local development/KB ingestion)
+resource userSearchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(userObjectId)) {
+  name: guid(searchService.id, userObjectId, searchIndexDataReaderRoleId)
+  scope: searchService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReaderRoleId)
+    principalId: userObjectId
+    principalType: 'User'
+    description: 'Allows user to query Azure AI Search for local development'
+  }
+}
+
 // Grant Function App access to Key Vault
 resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
   name: 'add'
@@ -97,3 +121,5 @@ resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-
 
 output openAIRoleAssignmentId string = openAIRoleAssignment.id
 output searchRoleAssignmentId string = searchRoleAssignment.id
+output userOpenAIRoleAssignmentId string = !empty(userObjectId) ? userOpenAIRoleAssignment.id : ''
+output userSearchRoleAssignmentId string = !empty(userObjectId) ? userSearchRoleAssignment.id : ''
