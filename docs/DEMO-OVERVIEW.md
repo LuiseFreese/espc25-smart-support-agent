@@ -21,27 +21,33 @@ All demos share the following production resources in resource group `rg-smart-a
 
 ---
 
-## Demo 01: Ticket Triage with Prompt Flow
+## Demo 01: Ticket Triage with Prompt Flow (REFERENCE ONLY)
 
 ### Purpose
-Demonstrate **AI-powered ticket classification** using Azure OpenAI and Prompt Flow orchestration. Shows how to categorize support tickets by topic (Billing, Technical, Account, Access) and assign priority (High, Medium, Low) using LLM reasoning.
+**⚠️ NOT DEPLOYED** - This is a teaching reference showing how AI-powered ticket classification could work using Azure OpenAI and Prompt Flow.
 
-### Azure Resources Used
+**Production uses keyword-based triage instead** (see Demo 04) for 100% accuracy, zero cost, and instant response.
 
-| Resource | Usage |
+### Why This Demo Exists
+- **Educational:** Shows prompt engineering patterns for classification
+- **Comparison:** Demonstrates AI approach vs keyword approach
+- **Not Production:** Demo 04 uses simpler keyword matching
+
+### How It Would Work (If Deployed)
+
+| Resource | Potential Usage |
 |----------|-------|
 | **Azure OpenAI** (`gpt-4o-mini`) | LLM for ticket classification via structured prompts |
-| **AI Project** | Prompt Flow runtime and deployment |
-| **Application Insights** | Track classification accuracy and latency |
+| **AI Project** | Prompt Flow runtime (not deployed) |
+| **Application Insights** | Track classification accuracy (not deployed) |
 
-### Key Features
+### What It Teaches
 - Jinja2 prompt templates (`system.jinja2`, `classify.jinja2`)
 - Structured JSON output: `{"category": "...", "priority": "..."}`
-- Latency target: <2 seconds P95
-- Cost: ~$0.0001 per ticket
+- AI vs keyword trade-offs
 
-### Validation Status
-**FULLY FUNCTIONAL** - Classification logic validated
+### Historical Test Results
+**Tested but NOT deployed** - Classification logic was validated but we chose keywords
 - **Test Date**: November 14, 2025
 - **Category Accuracy**: 100% (5/5 correct)
 - **Priority Accuracy**: 80% (4/5 correct)
@@ -341,12 +347,12 @@ graph TB
 
 ## Current Status Summary
 
-| Demo | Status | Validation | Priority |
-|------|--------|------------|----------|
-| Demo 01: Triage | ✅ Functional | 100% category, 80% priority | ✅ Complete |
-| Demo 02: RAG | ✅ Functional | **100% pass rate** | ✅ Complete |
-| Demo 03: Agents | ✅ Functional | 100% tool selection | ✅ Complete |
-| Demo 04: Production | ✅ **Production** | **Fully tested** | ✅ Complete |
+| Demo | Status | Validation | Deployment |
+|------|--------|------------|------------|
+| Demo 01: Triage | 📚 Reference Only | Tested but not used | ❌ Not Deployed |
+| Demo 02: RAG | ✅ Deployed | **100% pass rate** | ✅ Production (func-rag) |
+| Demo 03: Agents | 📚 Reference Only | Pattern used in Demo 04 | ❌ Not Deployed |
+| Demo 04: Production | ✅ **Production** | **Fully tested** | ✅ Production (func-agents) |
 
 ---
 
@@ -360,10 +366,10 @@ graph TB
 
 ### Future Enhancements
 - Expand knowledge base (currently 11 documents)
-- Deploy Demo 01 triage prompt flow to replace keyword matching
-- Add automated webhook subscription renewal
+- Add automated webhook subscription renewal (currently manual every 3 days)
 - Implement ticket resolution confirmation workflow
 - Add evaluation pipeline for RAG quality metrics
+- Multi-language support for international deployments
 
 ---
 

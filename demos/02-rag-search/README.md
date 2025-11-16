@@ -122,7 +122,7 @@ Include citations [1], [2] for each fact.
 
 ```mermaid
 flowchart TD
-    A[User Question:<br/>How do I reset my password?] --> B[1. Generate Query Embedding]
+    A[User Question:<br/>How do I reset <br/>my password?] --> B[1. Generate <br/>Query Embedding]
     B --> B1[Azure OpenAI:<br/>text-embedding-3-large<br/>3072-dimensional vector]
     B1 --> C[2. Hybrid Search<br/>Azure AI Search]
     
@@ -146,7 +146,7 @@ flowchart TD
     
     E1 --> F[5. Response with Citations]
     
-    F --> F1["To reset your password:<br/>1. Go to portal.example.com/reset<br/>2. Enter your email<br/>3. Check for reset link<br/><br/>Sources: Password Reset Guide<br/>Confidence: 0.85"]
+    F --> F1["To reset your password:<br/>1. Go to <br/>portal.example.com/reset<br/>2. Enter your email<br/>3. Check for reset link<br/><br/>Sources:<br/>Password Reset Guide<br/>Confidence: 0.85"]
     
     style A fill:#e1f5ff
     style D1 fill:#d4edda
@@ -222,22 +222,11 @@ Successfully indexed 3 documents to kb-support index
 - **Relevance:** Top result should answer query 90%+ of time
 - **Confidence:** Average confidence ≥0.7 for indexed topics
 
-## Next Steps
+---
 
-To improve RAG quality:
+## How to Use This Demo (For Learning/Testing)
 
-1. **Add More Documents:** Expand `content/` directory with your KB
-2. **Tune Chunking:** Adjust chunk size for optimal retrieval (currently full docs)
-3. **Monitor Confidence:** Use Application Insights to find low-confidence queries
-4. **Refine Prompts:** Update answer generation prompt in RAG function
-
-See main [README.md](../../README.md) for deployment instructions.
-│                  │   2. Click 'Forgot Password' [1]
-│                  │   3. Check email (5 min) [2]"
-└──────────────────┘
-```
-
-## Part 1: Ingest Knowledge Base
+### Step 1: Ingest Knowledge Base
 
 ### Prerequisites
 
@@ -282,11 +271,11 @@ The created index includes:
 - **content**: Full document text (searchable)
 - **contentVector**: 3072-dim embedding for vector search
 - **Vector profile**: HNSW algorithm with cosine similarity
-- **Semantic config**: Title + content fields for re-ranking
+- **Semantic config:** Title + content fields for re-ranking
 
-## Part 2: RAG Query Flow
+### Step 2: Test RAG Query Flow
 
-### Run Tests
+#### Run Tests
 
 ```powershell
 # From repo root
@@ -310,9 +299,9 @@ Expected output:
 ### How RAG Improves Accuracy
 
 **Without RAG (GPT-4o-mini alone):**
-- ❌ May hallucinate URLs or procedures
-- ❌ No source citations
-- ❌ Cannot access company-specific processes
+- May hallucinate URLs or procedures
+- No source citations
+-  Cannot access company-specific processes
 - **Accuracy**: ~60% for internal questions
 
 **With RAG (Azure AI Search + GPT-4o-mini):**
@@ -417,18 +406,13 @@ Grounded answer with citations
 ├── flow.dag.yaml              # Prompt flow definition
 ├── retrieve.py                # Python retrieval tool
 ├── prompts/
-│   └── answer_prompt.jinja2   # Answer generation template
+│   └── answer_prompt.jinja2   # Answer generation template (reference)
 └── requirements.txt
 ```
 
-## Deployment
+**Note:** The Prompt Flow files (`flow.dag.yaml`, `retrieve.py`) are reference implementations. Production uses Azure Functions (`func-rag-*`) deployed via `scripts/deploy.ps1`.
 
-Deploy the flow to Azure AI Foundry:
-
-```bash
-pf flow build --source . --output dist --format docker
-pf flow deploy --source dist --name rag-support-agent
-```
+---
 
 ## Troubleshooting
 
@@ -439,20 +423,7 @@ pf flow deploy --source dist --name rag-support-agent
 | Embedding errors | Confirm `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` exists |
 | Flow validation fails | Run `pf flow validate -f flow.dag.yaml --verbose` |
 
-## Evaluation
-
-To measure RAG quality (relevance, groundedness, coherence):
-
-```bash
-# Create evaluation dataset
-# data/rag_eval.jsonl with question, expected_answer, ground_truth
-
-# Run evaluation
-pf flow test -f flow.dag.yaml --inputs data/rag_eval.jsonl
-
-# Calculate metrics
-# (Implement custom evaluators for precision, recall, F1)
-```
+---
 
 ## Validation Results
 
@@ -483,25 +454,7 @@ Tested with 5 different support scenarios:
 - **Failed**: 0
 - **Average Confidence**: 0.72
 
-### 🔍 Observations
-
-**What's Working**:
-- Score-based confidence calculation (0.1-0.9 range based on semantic ranking)
-- 100% pass rate after adding targeted KB document for duplicate billing scenarios
-- High-quality responses across all query types
-- Detailed answers with step-by-step instructions
-- Fast response times (<2 seconds per query)
-
-**Knowledge Base Improvements**:
-- Added `duplicate-charges-guide.md` with specific "charged twice" terminology
-- Improved semantic matching for billing-related queries (0.4 → 0.8 confidence)
-
-**Known Limitations**:
-- ⚠️ Billing queries get lower confidence (0.4) - may need more billing documentation in KB
-- ⚠️ Knowledge base limited to 10 documents
-- ⚠️ Confidence threshold for auto-reply set at 0.7 (may need tuning based on more data)
-
-### 📝 Test Command
+### Test Command
 
 ```powershell
 # Set environment variable
@@ -527,23 +480,18 @@ az functionapp keys list --name func-rag-dw7z4hg4ssn2k --resource-group rg-smart
 - Chat model (`gpt-4o-mini`) generating answers
 - Semantic ranking returning relevant results
 
-**Integration**:
-- Used by Demo 04b for knowledge base search
+**Integration:**
+- Used by Demo 04 for knowledge base search
 - Called via `POST /api/rag-search` with `{"question": "..."}` body
 - Returns `{"answer": "...", "confidence": 0.0-1.0, "sources": [...]}`
 
-### 🔄 Next Steps
+---
 
-To improve RAG performance:
+## Future Enhancements (Optional)
 
-1. **Expand Knowledge Base** - Add more documents covering:
-   - Detailed billing procedures
-   - Software installation guides
-   - Security/compliance topics
-   - Common troubleshooting scenarios
+Possible improvements for production scale:
 
-2. **Tune Confidence Threshold** - Collect more data to optimize the 0.7 threshold
-
-3. **Add Evaluation Pipeline** - Implement automated quality metrics (relevance, groundedness)
-
-4. **Enable Prompt Flow** - Deploy the `flow.dag.yaml` for more sophisticated answer generation
+1. **Expand Knowledge Base** - Add more documents for broader coverage
+2. **Tune Confidence Threshold** - Optimize based on production feedback
+3. **Add Evaluation Pipeline** - Automated quality metrics (relevance, groundedness)
+4. **Implement Caching** - Cache frequent queries to reduce cost/latency

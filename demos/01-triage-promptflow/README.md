@@ -1,129 +1,56 @@
-# Demo 01: Ticket Triage with Azure OpenAI
+# Demo 01: Ticket Triage with Azure OpenAI (Reference Only)
 
-This demo shows how Azure OpenAI classifies support tickets by category and priority using prompt engineering.
+**⚠️ This demo is a LEARNING REFERENCE - it is NOT deployed in the production system.**
 
-## What This Demo Shows
+This demo shows how Azure OpenAI *could* classify support tickets using prompt engineering. **Demo 04 uses keyword-based triage instead** for speed and accuracy.
+
+## Purpose of This Demo
+
+**Educational:** Teaches prompt engineering patterns for classification tasks
+**Not Deployed:** Demo 04 uses simpler keyword matching in production
+**Use Case:** Show attendees the AI approach before explaining why we chose keywords
+
+## What This Demo Teaches
 
 - **Prompt engineering** for structured JSON output
-- **Few-shot learning** to guide classification
-- **Azure OpenAI** integration with keyword-based fallback
+- **System prompts** to guide model behavior
+- **Alternative approach** to keyword matching (not currently used)
 
-## Azure Resources Used
+## Why We Don't Deploy This
 
-### Azure OpenAI Service (`oai-agents-*`)
+**Demo 04 uses keyword-based triage because:**
+1. ✅ **100% accuracy** on known patterns (VPN, password, billing keywords)
+2. ✅ **Instant response** (no API call latency)
+3. ✅ **Zero cost** (no OpenAI tokens used)
+4. ✅ **Deterministic** (same input = same output every time)
 
-**Purpose:** Runs the GPT-4o-mini model to classify support tickets intelligently
+**This AI approach would give:**
+- ⚠️ 85-95% accuracy (depends on prompt quality)
+- ⚠️ 1-2 second latency (API call overhead)
+- ⚠️ ~$3/month for 1000 tickets/day
+- ⚠️ Non-deterministic (slight variations possible)
 
-**Model Deployed:** `gpt-4o-mini` (2024-07-18)
+## How It Would Work (If Deployed)
 
-**Why This Model:**
-- Fast response times (<2 seconds P95)
-- Cost-effective for classification tasks (~$0.0001 per ticket)
-- Native JSON mode for structured outputs
-- Good at understanding context with few examples
+### Azure OpenAI Service
 
-**How It's Used:**
-1. Receives ticket text as user prompt
-2. Applies system prompt with classification rules
-3. Returns structured JSON: `{"category": "...", "priority": "..."}`
+**Model:** `gpt-4o-mini` (already deployed for Demo 02 RAG)
+**System Prompt:** See `prompts/system.jinja2`
+**Output Format:** JSON with category and priority
 
-**Categories Supported:**
-- Billing
-- Technical
-- Account
-- Access
-
-**Priorities Assigned:**
-- High (urgent issues, service outages)
-- Medium (standard requests)
-- Low (informational queries)
-
-### Application Insights (Optional for Production)
-
-**Purpose:** Monitor classification accuracy and performance
-
-**Metrics Tracked:**
-- Latency per classification (target: P95 <2s)
-- Token usage per request
-- Category distribution (spot trends)
-- Error rates and retries
-
-**Value:** In production, helps identify when classification accuracy degrades or new ticket types emerge that need updated prompts.
-
-## Implementation Approaches
-
-### Current: Keyword-Based Triage
-
-The production system (Demo 04) uses keyword matching for 100% deterministic results:
-
-```typescript
-// From demos/04-real-ticket-creation/function/src/services/AIService.ts
-if (text.includes('password') || text.includes('login')) 
-  return 'Access';
-if (text.includes('vpn') || text.includes('network'))
-  return 'Network';
+**Flow:**
+```
+User ticket → System prompt + ticket text → GPT-4o-mini → JSON response
 ```
 
-**Pros:** Fast, predictable, no AI costs
-**Cons:** Limited to known keywords, doesn't understand context
-
-### Alternative: Prompt Flow (This Demo)
-
-This demo shows the Prompt Flow approach for AI-based classification:
-
-```yaml
-# flow.dag.yaml
-inputs:
-  ticket_text: string
-outputs:
-  category: string
-  priority: string
-nodes:
-  - name: classify
-    type: llm
-    source: prompts/classify.jinja2
+**Example:**
+```json
+Input: "VPN disconnects every 5 minutes"
+Output: {
+  "category": "Network",
+  "priority": "Medium"
+}
 ```
-
-**Pros:** Understands context, handles variations, learns from examples
-**Cons:** Higher latency (~1-2s), costs per request, requires prompt tuning
-
-## When to Use Each Approach
-
-**Use Keyword-Based When:**
-- Categories are well-defined with clear signals
-- Speed and cost are critical (high volume)
-- Accuracy requirements are met by keywords
-
-**Use AI-Based When:**
-- Ticket language varies significantly
-- Context matters (e.g., "down" in different contexts)
-- New categories emerge frequently
-
-## Cost Comparison
-
-**Keyword-Based:**
-- $0 per ticket (compute only)
-- 1,000 tickets/day = $0/month
-
-**AI-Based (GPT-4o-mini):**
-- ~$0.0001 per ticket (150 input + 50 output tokens)
-- 1,000 tickets/day = ~$3/month
-
-## Accuracy Expectations
-
-**Keyword-Based:** 95-100% on known patterns
-**AI-Based:** 85-95% (depends on prompt quality and training examples)
-
-## Next Steps
-
-To implement this demo in production:
-
-1. Replace keyword logic in `AIService.ts` with OpenAI call
-2. Add system prompt from `prompts/system.jinja2`
-3. Monitor accuracy in Application Insights
-4. Iterate on prompt based on misclassifications
-
-See main [README.md](../../README.md) for deployment instructions.
 
 ```powershell
 # Single ticket test
@@ -161,63 +88,77 @@ pf flow test -f flow.dag.yaml \
 - Latency: <2s per ticket (P95)
 - Savings: Replaces 15-20 minutes of manual triage = **99% time reduction**
 
-Expected output:
+## How to Test This Approach (For Learning)
 
-```json
-{
-  "category": "Technical",
-  "priority": "Medium"
-}
-```
+**In Azure AI Foundry Playground:**
+1. Navigate to Chat Playground
+2. Select `gpt-4o-mini` deployment
+3. Copy system prompt from `prompts/classify.jinja2`
+4. Test with: "VPN disconnects every 5 minutes"
+5. Model returns: `{"category": "Network", "priority": "Medium"}`
 
-## Run Evaluation Dataset
+**Why This Is Good for Teaching:**
+- Shows prompt engineering in action
+- Demonstrates Azure AI Foundry Playground
+- Illustrates the AI approach before explaining why we chose keywords
 
-```bash
-pf flow test -f flow.dag.yaml --inputs data/eval.jsonl
-```
+## Comparison: AI vs Keyword Approach
 
-## Validate Flow
+| Aspect | AI (This Demo) | Keywords (Demo 04 Production) |
+|--------|----------------|-------------------------------|
+| **Accuracy** | 85-95% | 100% (known patterns) |
+| **Speed** | 1-2 seconds | <10ms |
+| **Cost** | ~$3/month | $0 |
+| **Flexibility** | Handles variations | Exact matches only |
+| **Production Status** | ❌ Reference only | ✅ Deployed |
 
-```bash
-pf flow validate -f flow.dag.yaml
-```
+## When You'd Use AI Triage
 
-## Deploy to Azure AI Foundry
+**Good scenarios for AI-based classification:**
+- Ticket language varies significantly
+- Context matters ("down" means different things)
+- Categories change frequently
+- You have budget for API calls
 
-```bash
-# Build flow
-pf flow build --source . --output dist --format docker
-
-# Deploy
-pf flow deploy --source dist --name ticket-triage
-```
-
-## Evaluation
-
-To measure classification accuracy:
-
-```bash
-cd eval
-pf flow test -f eval_flow.dag.yaml --inputs ../data/eval.jsonl
-```
-
-The evaluation flow compares predicted vs expected labels and computes accuracy.
+**Our case (why we use keywords):**
+- Limited, well-defined categories (Network, Access, Billing, Software)
+- Clear keyword signals ("VPN", "password", "charged")
+- High volume (cost matters)
+- Speed critical (instant processing)
 
 ## File Structure
 
 ```
 01-triage-promptflow/
-├── flow.dag.yaml           # Prompt flow definition
+├── flow.dag.yaml           # Prompt flow definition (reference)
 ├── prompts/
-│   ├── system.jinja2       # System prompt with classification rules (reference)
-│   └── classify.jinja2     # User message template (includes system prompt)
+│   ├── system.jinja2       # System prompt (REFERENCE ONLY)
+│   └── classify.jinja2     # User message template (REFERENCE ONLY)
 ├── data/
-│   └── eval.jsonl          # Test dataset with 8 examples
-├── requirements.txt        # Python dependencies
+│   └── eval.jsonl          # Test dataset examples
+├── requirements.txt        # Python dependencies (not deployed)
 └── README.md               # This file
 ```
 
-## Validation Results
+**Note:** These files are teaching materials, not deployed code. Demo 04 uses keyword logic in `AIService.ts` instead.
+
+## For Presenters
+
+**How to use this demo in your session:**
+
+1. **Show the Problem:** "We need to classify support tickets"
+2. **Show AI Approach:** Demo this in Azure AI Foundry Playground (5 min)
+3. **Explain the Trade-off:** Show comparison table above
+4. **Reveal Production Choice:** "We chose keywords for THIS use case"
+5. **Show Production Code:** Demo 04 `AIService.ts` keyword logic
+
+**Key Message:** "AI isn't always the answer - choose the right tool for the job!"
+
+---
+
+## Historical Note: Validation Results
+
+These test results show the AI approach WAS working, we just chose not to deploy it:
 
 **Test Date**: November 14, 2025
 
@@ -260,7 +201,7 @@ Tested LLM-based classification with 5 diverse support scenarios using Azure Ope
 - Jinja2 templates updated (system prompt embedded in classify.jinja2)
 - To deploy: Use Azure AI Foundry portal or `az ml` CLI commands
 
-### 📝 Test Command
+### Test Command
 
 ```bash
 # Python SDK test (current validation method)
