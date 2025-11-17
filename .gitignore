@@ -77,6 +77,7 @@ Thumbs.db
 # Session planning (internal)
 # Session-specific documentation (excluded - sensitive presentation notes)
 docs/SESSION-STORYLINE.md
+docs/WEBHOOK-MANAGEMENT.md
 PRESENTATION-GUIDE.md
 .github/copilot-instructions.md
 
@@ -84,3 +85,4 @@ demos/03-agent-with-tools/agent/post-restart/deployments/
 demos/03-agent-with-tools/agent/post-restart/LogFiles/
 docs/EMBEDDINGS-EXPLAINED.md
 docs/SEARCH-TECHNOLOGIES-EXPLAINED.md
+docs/WEBHOOK-MANAGEMENT.md

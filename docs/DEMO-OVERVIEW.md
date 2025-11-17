@@ -278,6 +278,129 @@ Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/
 
 ---
 
+## Demo 05: Copilot Studio Plugin Integration
+
+### Purpose
+Demonstrate **Copilot Studio extensibility** by exposing the triage classification as a REST API action. Shows how to integrate custom AI logic into Microsoft 365 Copilot through OpenAPI-based plugins.
+
+### Azure Resources Used
+
+| Resource | Usage |
+|----------|-------|
+| **Function App** (`func-triage-7egpzzovabxku`) | REST API endpoint for triage classification |
+| **OpenAPI Specification** (`triage-api.yaml`) | API contract for Copilot Studio |
+| **API Key Authentication** | Function key-based security |
+| **Azure OpenAI** (`gpt-4o-mini`) | Keyword-based triage logic (same as Demo 04) |
+
+### Key Features
+- **OpenAPI Integration**: Standards-based REST API definition
+- **Copilot Studio Action**: Appears as "Classify support ticket" tool
+- **Keyword Classification**: Fast, deterministic triage (Network, Access, Billing, Software)
+- **Priority Detection**: Identifies urgency from email content
+- **Zero Dependencies**: Standalone service (no Graph, no RAG, no storage)
+- **Function Key Security**: Simple authentication for Copilot Studio
+
+### Validation Status
+**DEPLOYED AND TESTED** - Working in Copilot Studio
+- **Deployment Date**: December 2024
+- **Endpoint**: `https://func-triage-<uniqueid>.azurewebsites.net/api/triage`
+- **Function Key**: Get via `az functionapp keys list --name func-triage-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv`
+- **OpenAPI Host**: Configured correctly in `triage-api.yaml`
+
+### Copilot Studio Integration
+
+#### Setup Steps
+1. Upload `triage-api.yaml` to Copilot Studio (Tools → REST API)
+2. Configure authentication connection (header: `x-functions-key`)
+3. Test the action in Copilot Studio
+4. Configure agent with description and instructions
+5. Publish agent
+
+**📚 Complete Setup Guide**: [COPILOT-STUDIO-SETUP.md](../demos/05-triage-plugin/COPILOT-STUDIO-SETUP.md)
+
+#### Agent Configuration
+- **Name**: IT Support Assistant
+- **Tool**: "Classify support ticket"
+- **Suggested Prompts**:
+  - "My VPN keeps disconnecting"
+  - "I forgot my password and need to reset it"
+  - "I have a question about my invoice"
+  - "Help me install the new software"
+  - "URGENT: Cannot access my email - critical issue!"
+
+**📋 Agent Config**: [AGENT-CONFIGURATION.md](../demos/05-triage-plugin/AGENT-CONFIGURATION.md)
+
+### Test Results
+
+#### Copilot Studio Tests
+
+| Test Prompt | Expected Category | Expected Priority | Status |
+|-------------|-------------------|-------------------|--------|
+| "My VPN keeps disconnecting" | Network | Medium | ✅ Passed |
+| "I forgot my password and it's URGENT" | Access | High | ✅ Passed |
+| "Question about my invoice" | Billing | Medium | ✅ Passed |
+
+#### API Direct Tests
+
+```powershell
+# Get function key
+$functionKey = az functionapp keys list --name func-triage-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+# Test triage endpoint directly
+$body = @{
+    ticketText = "VPN keeps disconnecting every 5 minutes"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "https://func-triage-<uniqueid>.azurewebsites.net/api/triage" `
+  -Method Post -Body $body -ContentType "application/json" `
+  -Headers @{ "x-functions-key" = $functionKey }
+
+# Expected response:
+# { "category": "Network", "priority": "Medium" }
+```
+
+### How to Test
+
+#### Option 1: Copilot Studio (Recommended)
+1. Go to [copilotstudio.microsoft.com](https://copilotstudio.microsoft.com)
+2. Open "IT Support Assistant" agent
+3. Test with suggested prompts
+4. Verify classification appears in response
+
+#### Option 2: Direct API Call
+```powershell
+# Get function key
+az functionapp keys list --name func-triage-7egpzzovabxku --query "functionKeys.default" -o tsv
+
+# Test VPN scenario
+Invoke-RestMethod -Uri "https://func-triage-7egpzzovabxku.azurewebsites.net/api/triage" `
+  -Method Post -Body '{"ticketText":"VPN disconnects"}' `
+  -ContentType "application/json" -Headers @{ "x-functions-key" = "YOUR_KEY" }
+```
+
+### Important Notes
+
+⚠️ **This tool ONLY classifies tickets** - it returns category and priority, but does NOT provide troubleshooting answers.
+
+For better agent responses:
+- Add **Knowledge sources** in Copilot Studio
+- Upload KB documents from `demos/02-rag-search/content/`
+- Or update agent instructions with specific troubleshooting steps
+
+### Architecture Comparison
+
+| Component | Demo 04 (Production) | Demo 05 (Copilot Plugin) |
+|-----------|---------------------|-------------------------|
+| **Trigger** | Microsoft Graph webhook | User chat in Copilot Studio |
+| **Input** | Email from inbox | Text from chat |
+| **Triage** | Keyword-based (same logic) | Keyword-based (same logic) |
+| **RAG Search** | ✅ Yes (func-rag) | ❌ No (knowledge in Copilot Studio) |
+| **Ticket Creation** | ✅ Yes (Table Storage) | ❌ No (classification only) |
+| **Response** | Auto-reply or escalation | Agent chat response |
+| **Authentication** | Managed Identity + Graph | Function key |
+
+---
+
 ## Architecture Flow (Demo 04)
 
 ```mermaid
@@ -335,6 +458,7 @@ graph TB
 2. **Demo 02** - Add knowledge base search (RAG)
 3. **Demo 03** - Add function calling for actions
 4. **Demo 04** - Combine everything in production system
+5. **Demo 05** - Extend with Copilot Studio integration
 
 ### Skill Progression
 
@@ -342,6 +466,7 @@ graph TB
 - **Intermediate**: Demo 02 (RAG implementation)
 - **Advanced**: Demo 03 (Agent function calling)
 - **Expert**: Demo 04 (Event-driven production architecture)
+- **Integration**: Demo 05 (Copilot Studio extensibility)
 
 ---
 
@@ -353,6 +478,7 @@ graph TB
 | Demo 02: RAG | ✅ Deployed | **100% pass rate** | ✅ Production (func-rag) |
 | Demo 03: Agents | 📚 Reference Only | Pattern used in Demo 04 | ❌ Not Deployed |
 | Demo 04: Production | ✅ **Production** | **Fully tested** | ✅ Production (func-agents) |
+| Demo 05: Copilot Plugin | ✅ **Deployed** | **Tested in Copilot Studio** | ✅ Production (func-triage) |
 
 ---
 
@@ -370,6 +496,8 @@ graph TB
 - Implement ticket resolution confirmation workflow
 - Add evaluation pipeline for RAG quality metrics
 - Multi-language support for international deployments
+- **Demo 05**: Add Knowledge sources to Copilot Studio for better answers
+- **Demo 05**: Extend with ticket creation action (create tickets from Copilot chat)
 
 ---
 
@@ -383,6 +511,7 @@ graph TB
 | Email Processing | `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/processsupportemail` | Manual ticket creation |
 | Webhook | `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook` | Email notifications |
 | Subscription Manager | `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription` | Webhook management |
+| **Triage API** | `https://func-triage-7egpzzovabxku.azurewebsites.net/api/triage` | **Copilot Studio triage classification** |
 
 ### Environment Variables
 
@@ -424,4 +553,6 @@ RAG_FUNCTION_KEY=<from-az-cli>
 - **Demo 02 README**: `demos/02-rag-search/README.md` - RAG implementation
 - **Demo 03 README**: `demos/03-agent-with-tools/README.md` - Function calling agent
 - **Demo 04 README**: `demos/04-real-ticket-creation/function/README.md` - Production system
+- **Demo 05 README**: `demos/05-triage-plugin/README.md` - Copilot Studio plugin integration
+  - **Setup Guide**: `demos/05-triage-plugin/COPILOT-STUDIO-SETUP.md` - Complete setup guide with agent configuration and detailed steps
 - **This Document**: `DEMO-OVERVIEW.md` - Resource mapping and demo purposes

@@ -1,0 +1,145 @@
+swagger: "2.0"
+info:
+  title: Support Ticket Triage API
+  description: |
+    Classifies support tickets into categories and priority levels using keyword-based analysis.
+
+    Categories:
+    - Access: Login, password, authentication issues
+    - Network: VPN, connectivity, network problems
+    - Billing: Invoices, charges, payments, refunds
+    - Software: Applications, installations, programs
+    - Other: All other issues
+
+    Priority Levels:
+    - High: Urgent, critical, emergency situations
+    - Medium: Standard support requests
+    - Low: Feature requests, non-urgent items
+  version: "1.0.0"
+  contact:
+    name: Support Team
+    email: support@company.com
+host: func-triage-7egpzzovabxku.azurewebsites.net
+basePath: /api
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+securityDefinitions:
+  apiKeyHeader:
+    type: apiKey
+    name: x-functions-key
+    in: header
+    description: Azure Function API key for authentication
+security:
+  - apiKeyHeader: []
+paths:
+  /triage:
+    post:
+      summary: Classify support ticket
+      description: |
+        Analyzes ticket text and returns category and priority classification.
+        Uses keyword-based matching for fast, deterministic results.
+      operationId: classifyTicket
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Ticket text to classify
+          required: true
+          schema:
+            type: object
+            required:
+              - ticket_text
+            properties:
+              ticket_text:
+                type: string
+                minLength: 10
+                description: The support ticket text to classify
+                example: "I can't login to my account and need help resetting my password"
+      responses:
+        200:
+          description: Successfully classified ticket
+          schema:
+            type: object
+            properties:
+              category:
+                type: string
+                enum:
+                  - Access
+                  - Network
+                  - Billing
+                  - Software
+                  - Other
+                description: The classified category of the ticket
+                example: "Access"
+              priority:
+                type: string
+                enum:
+                  - High
+                  - Medium
+                  - Low
+                description: The assigned priority level
+                example: "Medium"
+          examples:
+            application/json:
+              category: "Access"
+              priority: "Medium"
+        400:
+          description: Invalid request (missing or invalid ticket_text)
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "ticket_text is required and must not be empty"
+        500:
+          description: Internal server error
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Internal server error during classification"
+      tags:
+        - Triage
+definitions:
+  TriageRequest:
+    type: object
+    required:
+      - ticket_text
+    properties:
+      ticket_text:
+        type: string
+        minLength: 10
+        description: The support ticket text to classify
+  TriageResponse:
+    type: object
+    properties:
+      category:
+        type: string
+        enum:
+          - Access
+          - Network
+          - Billing
+          - Software
+          - Other
+      priority:
+        type: string
+        enum:
+          - High
+          - Medium
+          - Low
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: string
+tags:
+  - name: Triage
+    description: Support ticket classification operations

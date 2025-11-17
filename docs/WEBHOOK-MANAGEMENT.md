@@ -16,13 +16,13 @@ New Email → Microsoft Graph detects → Webhook notification → GraphWebhook 
 ## Webhook Endpoints
 
 ### GraphWebhook (Event Processor)
-- **URL:** `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook`
+- **URL:** `https://func-agents-<uniqueid>.azurewebsites.net/api/graphwebhook`
 - **Method:** GET (validation), POST (notifications)
 - **Auth:** Anonymous (required for Microsoft Graph validation)
 - **Purpose:** Receives and processes email change notifications
 
 ### ManageSubscription (Subscription Manager)
-- **URL:** `https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription`
+- **URL:** `https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription`
 - **Method:** GET (list), POST (create), DELETE (remove)
 - **Auth:** Function key required
 - **Purpose:** Create, renew, and manage webhook subscriptions
@@ -32,8 +32,10 @@ New Email → Microsoft Graph detects → Webhook notification → GraphWebhook 
 ### Check Current Subscription Status
 
 ```powershell
-$functionKey = "<your-function-key>"
-$result = Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription" `
+# Get function key
+$functionKey = az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+$result = Invoke-RestMethod -Uri "https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription" `
   -Method Get `
   -Headers @{ "x-functions-key" = $functionKey }
 
@@ -46,11 +48,11 @@ $result | ConvertTo-Json
   "count": 1,
   "subscriptions": [
     {
-      "id": "dfb66a7c-f4f2-484c-913b-4abd23c230ce",
-      "resource": "/users/YOUR_SUPPORT_EMAIL@yourdomain.com/mailFolders/Inbox/messages",
+      "id": "<subscription-id>",
+      "resource": "/users/<support-email>@<domain>/mailFolders/Inbox/messages",
       "changeType": "created",
       "expirationDateTime": "2025-11-15T16:50:25.492Z",
-      "notificationUrl": "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook"
+      "notificationUrl": "https://func-agents-<uniqueid>.azurewebsites.net/api/graphwebhook"
     }
   ]
 }
@@ -59,8 +61,10 @@ $result | ConvertTo-Json
 ### Create New Subscription
 
 ```powershell
-$functionKey = "<your-function-key>"
-$result = Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription" `
+# Get function key
+$functionKey = az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+$result = Invoke-RestMethod -Uri "https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription" `
   -Method Post `
   -Headers @{ "x-functions-key" = $functionKey }
 
@@ -75,10 +79,13 @@ Write-Host "Subscription created! Expires: $($result.expirationDateTime)"
 ### Delete Subscription
 
 ```powershell
-$functionKey = "<your-function-key>"
-$subscriptionId = "dfb66a7c-f4f2-484c-913b-4abd23c230ce"
+# Get function key
+$functionKey = az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
 
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription?id=$subscriptionId" `
+# Get subscription ID from list command first
+$subscriptionId = "<subscription-id-from-list>"
+
+Invoke-RestMethod -Uri "https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription?id=$subscriptionId" `
   -Method Delete `
   -Headers @{ "x-functions-key" = $functionKey }
 ```
@@ -148,8 +155,10 @@ export async function RenewSubscription(
 
 **Fix:**
 ```powershell
-# Create new subscription
-Invoke-RestMethod -Uri "https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/managesubscription" `
+# Get function key and create new subscription
+$functionKey = az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+Invoke-RestMethod -Uri "https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription" `
   -Method Post -Headers @{ "x-functions-key" = $functionKey }
 ```
 
@@ -207,13 +216,13 @@ if (fromEmail === supportEmail) {
 ```powershell
 # Recent webhook calls
 az monitor app-insights query \
-  --app appi-smart-agents-dw7z4hg4ssn2k \
+  --app appi-smart-agents-<uniqueid> \
   --resource-group rg-smart-agents-dev \
   --analytics-query "requests | where name == 'GraphWebhook' | where timestamp > ago(1h) | order by timestamp desc"
 
 # Webhook errors
 az monitor app-insights query \
-  --app appi-smart-agents-dw7z4hg4ssn2k \
+  --app appi-smart-agents-<uniqueid> \
   --resource-group rg-smart-agents-dev \
   --analytics-query "exceptions | where timestamp > ago(1h) | where operation_Name == 'GraphWebhook'"
 ```
@@ -221,9 +230,11 @@ az monitor app-insights query \
 ### Subscription Health Check
 
 ```powershell
-# Create scheduled check
-$functionKey = "<key>"
-$subs = Invoke-RestMethod -Uri ".../api/managesubscription" -Method Get -Headers @{ ... }
+# Get function key
+$functionKey = az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+# Get subscriptions
+$subs = Invoke-RestMethod -Uri "https://func-agents-<uniqueid>.azurewebsites.net/api/managesubscription" -Method Get -Headers @{ "x-functions-key" = $functionKey }
 
 foreach ($sub in $subs.subscriptions) {
   $expiration = [datetime]$sub.expirationDateTime
@@ -251,9 +262,9 @@ foreach ($sub in $subs.subscriptions) {
 ### Required Environment Variables
 
 ```
-WEBHOOK_URL=https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api/graphwebhook
-WEBHOOK_CLIENT_STATE=SmartSupportAgent2025
-SUPPORT_EMAIL_ADDRESS=YOUR_SUPPORT_EMAIL@yourdomain.com
+WEBHOOK_URL=https://func-agents-<uniqueid>.azurewebsites.net/api/graphwebhook
+WEBHOOK_CLIENT_STATE=<unique-validation-string>
+SUPPORT_EMAIL_ADDRESS=<support-email>@<domain>
 GRAPH_CLIENT_ID=<app-registration-id>
 GRAPH_CLIENT_SECRET=<app-secret>
 GRAPH_TENANT_ID=<tenant-id>

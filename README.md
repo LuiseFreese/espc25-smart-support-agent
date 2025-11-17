@@ -56,10 +56,13 @@ Each demo builds on the previous, culminating in a production-ready system:
 
 | Demo | Focus | Status | Purpose |
 |------|-------|--------|---------|
-| **[01: Triage](demos/01-triage-promptflow/)** | Classification | Reference | Pattern used in Demo 04 |
+| **[01: Triage](demos/01-triage-promptflow/)** | Classification | Reference | Pattern used in Demos 04-05 |
 | **[02: RAG Search](demos/02-rag-search/)** | Knowledge retrieval | **Deployed** | HTTP endpoint called by Demo 04 |
 | **[03: Agent Tools](demos/03-agent-with-tools/)** | Function calling | Reference | Pattern used in Demo 04 |
 | **[04: Production](demos/04-real-ticket-creation/)** | Email automation | **Deployed** | Orchestrates all patterns |
+| **[05: Copilot Plugin](demos/05-triage-plugin/)** | Studio integration | **Deployed** | Triage as Copilot Studio action |
+
+**Demo 05 - Copilot Studio Plugin**: Standalone REST API that exposes the triage classification as a Copilot Studio action. Includes OpenAPI spec, authentication setup, and agent configuration. [Setup Guide →](demos/05-triage-plugin/COPILOT-STUDIO-SETUP.md)
 
 ## Quick Start
 
