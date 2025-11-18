@@ -218,6 +218,7 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     keyVaultName: keyVaultName
     userObjectId: currentUserObjectId
     createRoleAssignments: createRoleAssignments
+    deploymentIdentifier: 'main-function-app'
   }
 }
 
@@ -231,6 +232,7 @@ module ragRoleAssignments 'modules/role-assignments.bicep' = {
     keyVaultName: keyVaultName
     userObjectId: currentUserObjectId
     createRoleAssignments: createRoleAssignments
+    deploymentIdentifier: 'rag-function-app'
   }
 }
 

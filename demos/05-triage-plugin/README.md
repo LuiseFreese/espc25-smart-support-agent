@@ -1,6 +1,18 @@
-# Demo 05 - Triage Plugin for Copilot Studio
+# Demo 05 - Smart Support Assistant for Copilot Studio
 
-> Standalone REST API that classifies support tickets into categories and priorities, usable as a Copilot Studio plugin.
+> REST API with triage classification AND RAG-powered answers from knowledge base, integrated with Copilot Studio.
+
+## 🏗️ Deployment Architecture
+
+**Important:** Demo 05 endpoints are deployed as part of the main Agents function app (`func-agents`), not as a separate function app.
+
+- **Function App:** `func-agents-<uniqueid>` (same as Demo 04)
+- **Endpoints Included:**
+  - `/api/triage` - Ticket classification
+  - `/api/answer` - RAG-powered KB search
+  - (Plus all Demo 04 endpoints: GraphWebhook, ProcessSupportEmail, etc.)
+
+**Why?** Simpler deployment, shared authentication, reduced resource costs. The `deploy.ps1` script automatically includes Demo 05 when deploying Demo 04.
 
 ## 📚 Quick Links
 
@@ -8,35 +20,89 @@
 
 ## Overview
 
-This demo transforms the triage logic from Demo 01 into a production-ready REST API endpoint that:
-- Accepts ticket text via HTTP POST
-- Returns category and priority classification
-- Exposes OpenAPI 2.0 specification for Copilot Studio integration
-- Uses keyword-based classification (same proven logic from the main system)
-- **Note**: This tool **only classifies** - add Knowledge sources in Copilot Studio for helpful answers
+This demo provides two REST API endpoints for Copilot Studio integration:
+
+### 1. Answer Endpoint (`/api/answer`) - NEW in v2.0
+- Searches knowledge base using RAG (Retrieval-Augmented Generation)
+- Returns AI-generated answer with confidence score (0.1-0.95)
+- Same RAG engine as Demo 04 email automation
+- Enables confidence-based routing (≥0.7 = high confidence)
+
+### 2. Triage Endpoint (`/api/triage`)
+- Classifies tickets into categories (Network/Access/Billing/Software/Other)
+- Assigns priority levels (High/Medium/Low)
+- Uses proven keyword-based logic from Demo 04
+- Useful for analytics and ticket routing
+
+**Key Improvement:** Bot now provides actual solutions, not just classification!
 
 ## Architecture
 
+### Integration Flow
+
+```mermaid
+graph TB
+    subgraph "Demo 05: Copilot Studio Integration"
+        A[User in Microsoft 365] -->|Chat message| B[Copilot Studio Agent]
+        B -->|Calls TriageClassifier| C[REST API Call]
+        C -->|POST /api/triage| D[Azure Function<br/>func-triage]
+        D -->|Keyword Classification| E[Triage Logic<br/>Same as Demo 01/04]
+        E -->|Returns| F[JSON Response<br/>category + priority]
+        F -->|Tool Result| B
+        B -->|Synthesized Answer| G[Chat Response<br/>to User]
+    end
+    
+    subgraph "Components"
+        H[OpenAPI Spec<br/>triage-api.yaml]
+        I[Function Key<br/>Authentication]
+    end
+    
+    H -.->|Defines| C
+    I -.->|Secures| D
+    
+    style D fill:#0078d4,color:#fff
+    style E fill:#ffb900,color:#000
+    style B fill:#107c10,color:#fff
 ```
-┌─────────────────┐
-│ Copilot Studio  │
-│    Agent        │
-└────────┬────────┘
-         │ POST /api/triage
-         ▼
-┌─────────────────────────────┐
-│  Azure Function             │
-│  ┌─────────────────────────┐│
-│  │ triage endpoint         ││
-│  │ - Keyword matching      ││
-│  │ - Category detection    ││
-│  │ - Priority assignment   ││
-│  └─────────────────────────┘│
-└─────────────────────────────┘
-         │
-         ▼
-    { category, priority }
+
+### Comparison with Demo 04
+
+```mermaid
+graph LR
+    subgraph "Demo 04: Email Channel"
+        A1[Email Arrives] -->|Graph API| A2[Webhook]
+        A2 --> A3[Triage + RAG]
+        A3 --> A4[Create Ticket]
+        A4 --> A5[Auto-reply or<br/>Escalate]
+    end
+    
+    subgraph "Demo 05: Copilot Channel"
+        B1[Chat Message] -->|Copilot Studio| B2[REST API Call]
+        B2 --> B3[Triage Only]
+        B3 --> B4[Agent Response]
+        B4 --> B5[Continue Chat]
+    end
+    
+    subgraph "Shared Backend"
+        C1[Same Triage Logic<br/>Keyword-based Classification]
+    end
+    
+    A3 -.->|Uses| C1
+    B3 -.->|Uses| C1
+    
+    style A3 fill:#0078d4,color:#fff
+    style B3 fill:#0078d4,color:#fff
+    style C1 fill:#ffb900,color:#000
 ```
+
+| Aspect | Demo 04 (Email) | Demo 05 (Copilot) |
+|--------|----------------|-------------------|
+| **Trigger** | Email arrives | User chat message |
+| **Input** | Email body | Chat text |
+| **Classification** | Keyword-based | Same (API call) |
+| **Knowledge Base** | RAG function | Copilot knowledge sources |
+| **Action** | Create ticket, auto-reply | Chat response |
+| **User Experience** | Asynchronous (email) | Synchronous (chat) |
 
 ## Categories
 
@@ -53,6 +119,17 @@ This demo transforms the triage logic from Demo 01 into a production-ready REST 
 - **Low** - Low priority, when you can, no rush
 
 ## Quick Start
+
+### Prerequisites
+
+Before deploying, ensure Demo 02 RAG function is deployed (required for `/api/answer` endpoint):
+
+```powershell
+# Verify RAG function exists
+az functionapp list --resource-group rg-smart-agents-dev --query "[?contains(name, 'func-rag')].name" -o tsv
+```
+
+If not deployed, follow Demo 02 deployment first.
 
 ### 1. Create Function App
 
@@ -78,7 +155,25 @@ az functionapp config appsettings set \
   --settings AzureWebJobsFeatureFlags=EnableWorkerIndexing
 ```
 
-### 2. Deploy the Function
+### 2. Configure Environment Variables
+
+The answer endpoint needs to call the RAG function:
+
+```powershell
+# Get RAG function details
+$ragFunctionName = az functionapp list --resource-group rg-smart-agents-dev --query "[?contains(name, 'func-rag')].name" -o tsv
+$ragKey = az functionapp keys list --name $ragFunctionName --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+
+# Configure triage function to call RAG
+az functionapp config appsettings set \
+  --name "func-triage-$suffix" \
+  --resource-group rg-smart-agents-dev \
+  --settings \
+    RAG_ENDPOINT="https://$ragFunctionName.azurewebsites.net/api/rag-search" \
+    RAG_API_KEY="$ragKey"
+```
+
+### 3. Deploy the Function
 
 ```powershell
 cd demos/05-triage-plugin
@@ -96,22 +191,43 @@ func azure functionapp publish func-triage-$suffix
 az functionapp restart --name func-triage-$suffix --resource-group rg-smart-agents-dev
 ```
 
-### 3. Test the Deployment
+### 4. Test Both Endpoints
 
 ```powershell
 # Get function key
 $functionKey = az functionapp keys list --name func-triage-$suffix --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
 
-# Test VPN issue
-$body = @{ ticket_text = "My VPN keeps disconnecting" } | ConvertTo-Json
-Invoke-RestMethod -Uri "https://func-triage-$suffix.azurewebsites.net/api/triage" -Method Post -Headers @{'x-functions-key'=$functionKey; 'Content-Type'='application/json'} -Body $body
+# Test 1: Triage classification
+$triageBody = @{ ticket_text = "My VPN keeps disconnecting" } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://func-triage-$suffix.azurewebsites.net/api/triage" `
+  -Method Post `
+  -Headers @{'x-functions-key'=$functionKey; 'Content-Type'='application/json'} `
+  -Body $triageBody
+
+# Test 2: RAG-powered answer
+$answerBody = @{ question = "How do I reset my password?" } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://func-triage-$suffix.azurewebsites.net/api/answer" `
+  -Method Post `
+  -Headers @{'x-functions-key'=$functionKey; 'Content-Type'='application/json'} `
+  -Body $answerBody
 ```
 
-Expected response:
+Expected responses:
+
+**Triage:**
 ```json
 {
   "category": "Network",
   "priority": "Medium"
+}
+```
+
+**Answer:**
+```json
+{
+  "answer": "To reset your password, go to https://passwordreset.company.com...",
+  "confidence": 0.85,
+  "source": "password-reset.md"
 }
 ```
 

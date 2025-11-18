@@ -1,25 +1,12 @@
 swagger: "2.0"
 info:
-  title: Support Ticket Triage API
-  description: |
-    Classifies support tickets into categories and priority levels using keyword-based analysis.
-
-    Categories:
-    - Access: Login, password, authentication issues
-    - Network: VPN, connectivity, network problems
-    - Billing: Invoices, charges, payments, refunds
-    - Software: Applications, installations, programs
-    - Other: All other issues
-
-    Priority Levels:
-    - High: Urgent, critical, emergency situations
-    - Medium: Standard support requests
-    - Low: Feature requests, non-urgent items
-  version: "1.0.0"
+  title: IT Support Assistant API
+  description: Provides triage classification and RAG-powered knowledge base answers for IT support automation.
+  version: "3.0.1"
   contact:
     name: Support Team
     email: support@company.com
-host: func-triage-7egpzzovabxku.azurewebsites.net
+host: func-agents-dw7z4hg4ssn2k.azurewebsites.net
 basePath: /api
 schemes:
   - https
@@ -42,7 +29,7 @@ paths:
       description: |
         Analyzes ticket text and returns category and priority classification.
         Uses keyword-based matching for fast, deterministic results.
-      operationId: classifyTicket
+      operationId: triageTicket
       consumes:
         - application/json
       produces:
@@ -108,6 +95,88 @@ paths:
                 example: "Internal server error during classification"
       tags:
         - Triage
+  /answer:
+    post:
+      summary: Get AI-powered answer from knowledge base
+      description: |
+        Searches the knowledge base using RAG (Retrieval-Augmented Generation) and returns
+        an AI-generated answer with confidence score. Uses Azure AI Search with semantic ranking
+        to find the most relevant documentation and Azure OpenAI to generate the response.
+      operationId: searchKnowledgeBase
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: User's support question
+          required: true
+          schema:
+            type: object
+            required:
+              - question
+            properties:
+              question:
+                type: string
+                minLength: 5
+                description: The user's support question
+                example: "How do I reset my password?"
+      responses:
+        200:
+          description: Successfully retrieved answer from knowledge base
+          schema:
+            type: object
+            properties:
+              answer:
+                type: string
+                description: AI-generated answer based on knowledge base content
+                example: "To reset your password, go to https://passwordreset.company.com and follow these steps: 1. Enter your email address 2. Choose verification method (SMS or alternate email) 3. Create a new password with at least 12 characters..."
+              confidence:
+                type: number
+                format: float
+                minimum: 0.1
+                maximum: 0.95
+                description: Confidence score indicating answer quality (0.1-0.95). Use 0.7 as threshold for auto-reply vs escalation.
+                example: 0.85
+              source:
+                type: string
+                description: Name of the knowledge base document that provided the answer
+                example: "Password Reset"
+              sourceUrl:
+                type: string
+                description: |
+                  Direct link to the full knowledge base article. May be empty string if no URL available.
+                  Example: "https://github.com/LuiseFreese/espc25-smart-support-agent/blob/main/demos/02-rag-search/content/password-reset.md"
+                  Can be used to provide "Read more" links in chat responses.
+                example: "https://github.com/LuiseFreese/espc25-smart-support-agent/blob/main/demos/02-rag-search/content/password-reset.md"
+          examples:
+            application/json:
+              answer: "To reset your password, go to https://passwordreset.company.com..."
+              confidence: 0.85
+              source: "Password Reset"
+              sourceUrl: "https://github.com/LuiseFreese/espc25-smart-support-agent/blob/main/demos/02-rag-search/content/password-reset.md"
+        400:
+          description: Invalid request (missing or invalid question)
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "question is required and must not be empty"
+        500:
+          description: Internal server error or RAG service unavailable
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Failed to retrieve answer from knowledge base"
+              details:
+                type: string
+                example: "Connection timeout"
+      tags:
+        - Answer
 definitions:
   TriageRequest:
     type: object
@@ -135,11 +204,39 @@ definitions:
           - High
           - Medium
           - Low
+  AnswerRequest:
+    type: object
+    required:
+      - question
+    properties:
+      question:
+        type: string
+        minLength: 5
+        description: The user's support question
+  AnswerResponse:
+    type: object
+    properties:
+      answer:
+        type: string
+        description: AI-generated answer based on knowledge base
+      confidence:
+        type: number
+        format: float
+        minimum: 0.1
+        maximum: 0.95
+        description: Confidence score (0.1-0.95)
+      source:
+        type: string
+        description: Source knowledge base document
   ErrorResponse:
     type: object
     properties:
       error:
         type: string
+      details:
+        type: string
 tags:
   - name: Triage
     description: Support ticket classification operations
+  - name: Answer
+    description: RAG-powered knowledge base search operations

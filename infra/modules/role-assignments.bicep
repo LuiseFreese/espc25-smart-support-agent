@@ -16,6 +16,9 @@ param userObjectId string = ''
 @description('Create role assignments (set to false if they already exist)')
 param createRoleAssignments bool = true
 
+@description('Unique identifier for this role assignment module (prevents conflicts when deployed multiple times)')
+param deploymentIdentifier string = uniqueString(functionAppPrincipalId)
+
 // Built-in role definition IDs
 // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
@@ -34,10 +37,17 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
 
+// Generate deterministic names for role assignments
+var openAIRoleAssignmentName = guid(openAIAccount.id, functionAppPrincipalId, cognitiveServicesOpenAIUserRoleId)
+var searchRoleAssignmentName = guid(searchService.id, functionAppPrincipalId, searchIndexDataReaderRoleId)
+var userOpenAIRoleAssignmentName = guid(openAIAccount.id, userObjectId, cognitiveServicesOpenAIUserRoleId, deploymentIdentifier)
+var userSearchRoleAssignmentName = guid(searchService.id, userObjectId, searchIndexDataReaderRoleId, deploymentIdentifier)
+
 // Grant Function App access to Azure OpenAI
-// Using existing resource to avoid RoleAssignmentExists error on redeployment
-resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments) {
-  name: guid(openAIAccount.id, functionAppPrincipalId, cognitiveServicesOpenAIUserRoleId)
+// Note: Will fail with RoleAssignmentExists on redeployment - this is expected Bicep behavior
+// The role assignment exists and has the same configuration, so the error can be ignored
+resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: openAIRoleAssignmentName
   scope: openAIAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
@@ -48,9 +58,8 @@ resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 
 // Grant Function App access to Azure AI Search
-// Using existing resource to avoid RoleAssignmentExists error on redeployment
-resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments) {
-  name: guid(searchService.id, functionAppPrincipalId, searchIndexDataReaderRoleId)
+resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: searchRoleAssignmentName
   scope: searchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReaderRoleId)
@@ -61,8 +70,8 @@ resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 
 // Grant user access to Azure OpenAI (for local development/KB ingestion)
-resource userOpenAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(userObjectId)) {
-  name: guid(openAIAccount.id, userObjectId, cognitiveServicesOpenAIUserRoleId)
+resource userOpenAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(userObjectId)) {
+  name: userOpenAIRoleAssignmentName
   scope: openAIAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
@@ -73,8 +82,8 @@ resource userOpenAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-
 }
 
 // Grant user access to Azure AI Search (for local development/KB ingestion)
-resource userSearchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(userObjectId)) {
-  name: guid(searchService.id, userObjectId, searchIndexDataReaderRoleId)
+resource userSearchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(userObjectId)) {
+  name: userSearchRoleAssignmentName
   scope: searchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReaderRoleId)

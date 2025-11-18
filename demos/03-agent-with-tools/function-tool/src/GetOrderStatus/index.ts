@@ -11,9 +11,9 @@ const ORDERS: Record<string, any> = {
   '12345': {
     orderId: '12345',
     status: 'In Transit',
-    eta: '2025-11-15',
+    eta: '2025-12-03',
     trackingNumber: 'TRK-98765-ABCD',
-    items: ['Laptop Stand', 'Wireless Mouse'],
+    items: ['Laptop Stand', 'Wireless Mouse']
   },
   '67890': {
     orderId: '67890',

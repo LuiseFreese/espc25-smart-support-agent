@@ -9,6 +9,32 @@ from openai import AzureOpenAI
 
 app = func.FunctionApp()
 
+# KB article title to filename mapping for source URLs
+# Note: Titles must match what Azure AI Search returns (may differ from H1 in markdown)
+KB_ARTICLE_MAPPING = {
+    "Password Reset": "password-reset.md",
+    "Comprehensive Password Recovery and Reset Guide": "password-recovery-detailed.md",
+    "Account Access and Authentication Guide": "account-access-guide.md",
+    "Account Lockout and Access Issues Resolution Guide": "account-lockout-guide.md",
+    "VPN Connection Guide": "vpn-troubleshooting.md",
+    "Complete VPN Connection and Troubleshooting Guide": "vpn-comprehensive-guide.md",
+    "Billing and Payments": "billing-guide.md",
+    "Duplicate Charges and Double Billing Resolution Guide": "duplicate-charges-guide.md",
+    "Invoice Payment and Billing Updates Guide": "invoice-payment.md",
+    "Email and Calendar Support": "email-and-calendar.md",
+    "Software Installation and Update Guide": "software-installation-guide.md"
+}
+
+# Base URL for KB articles in GitHub
+GITHUB_REPO_BASE = "https://github.com/LuiseFreese/espc25-smart-support-agent/blob/main/demos/02-rag-search/content"
+
+def get_source_url(title: str) -> str:
+    """Map KB article title to GitHub URL"""
+    filename = KB_ARTICLE_MAPPING.get(title)
+    if filename:
+        return f"{GITHUB_REPO_BASE}/{filename}"
+    return ""  # Return empty string instead of None for OpenAPI 2.0 compatibility
+
 # Initialize clients
 search_endpoint = os.getenv("AZURE_AI_SEARCH_ENDPOINT")
 search_key = os.getenv("AZURE_AI_SEARCH_API_KEY")
@@ -211,11 +237,16 @@ Answer concisely based on the context above. If the context doesn't contain the 
 
         logging.info(f"Final confidence: {confidence}")
 
+        # Get URL for primary source
+        primary_source = sources[0] if sources else None
+        source_url = get_source_url(primary_source) if primary_source else ""
+
         return func.HttpResponse(
             json.dumps({
                 "answer": answer,
                 "confidence": round(confidence, 2),
-                "sources": list(set(sources[:5]))
+                "sources": list(set(sources[:5])),
+                "sourceUrl": source_url
             }),
             mimetype="application/json",
             status_code=200

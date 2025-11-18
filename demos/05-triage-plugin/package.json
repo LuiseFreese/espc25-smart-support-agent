@@ -11,7 +11,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@azure/functions": "^4.5.0"
+    "@azure/functions": "^4.5.0",
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^20.x",

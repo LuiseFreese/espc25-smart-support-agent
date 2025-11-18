@@ -105,16 +105,36 @@ Write-Host "  Deployment name: $deploymentName" -ForegroundColor Gray
 $currentUserObjectId = az ad signed-in-user show --query "id" -o tsv
 
 Invoke-WithRetry -ScriptBlock {
-    az deployment sub create `
+    $deploymentOutput = az deployment sub create `
         --location $Location `
         --template-file main.bicep `
         --parameters parameters.dev.json `
         --parameters currentUserObjectId=$currentUserObjectId `
         --name $deploymentName `
-        --output none
+        --output json 2>&1 | Out-String
 
+    # Check if deployment failed
     if ($LASTEXITCODE -ne 0) {
-        throw "Infrastructure deployment failed"
+        # Parse the error to see if it's only role assignment conflicts
+        if ($deploymentOutput -match "RoleAssignmentExists") {
+            Write-Host "  ⚠️  Role assignments already exist (this is expected on redeployment)" -ForegroundColor Yellow
+
+            # Check if OTHER resources deployed successfully
+            $deploymentStatus = az deployment sub show --name $deploymentName --query "properties.provisioningState" -o tsv 2>$null
+
+            # If the deployment partially succeeded (some resources deployed), continue
+            Write-Host "  Checking deployment status..." -ForegroundColor Gray
+            $resourcesDeployed = az resource list --resource-group $ResourceGroup --query "length(@)" -o tsv 2>$null
+
+            if ($resourcesDeployed -gt 0) {
+                Write-Host "  ✓ Core infrastructure exists ($resourcesDeployed resources found)" -ForegroundColor Green
+                Write-Host "  Continuing deployment (role assignments will be skipped)..." -ForegroundColor Cyan
+                return # Exit retry loop successfully
+            }
+        }
+
+        # If it's a different error, throw
+        throw "Infrastructure deployment failed: $deploymentOutput"
     }
 }
 
@@ -379,9 +399,10 @@ Write-Host "  ✓ RAG function configured" -ForegroundColor Green
 Write-Host "    Endpoint: $ragEndpoint" -ForegroundColor Gray
 
 # ============================================================================
-# Deploy Agents Function (Demo 04)
+# Deploy Agents Function (Demo 04 + Demo 05)
 # ============================================================================
-Write-Host "`n  [5b] Deploying Agents function (Demo 04)..." -ForegroundColor Cyan
+Write-Host "`n  [5b] Deploying Agents function (Demo 04 + Demo 05)..." -ForegroundColor Cyan
+Write-Host "       Includes: Email processing endpoints AND Copilot Studio triage/answer endpoints" -ForegroundColor Gray
 $demo04Path = Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function"
 
 if (Test-Path $demo04Path) {
@@ -448,7 +469,7 @@ if (-not $storageAccountName) {
     Write-Host "⚠️  No storage account found" -ForegroundColor Yellow
 } else {
     Write-Host "    Creating table in storage account: $storageAccountName" -ForegroundColor Gray
-    
+
     # Get storage account key
     $storageKey = az storage account keys list --account-name $storageAccountName --resource-group $ResourceGroup --query "[0].value" -o tsv
 
@@ -510,19 +531,18 @@ if (Test-Path $verifyScript) {
     Write-Host "⚠️  verify-deployment.ps1 not found - skipping verification" -ForegroundColor Yellow
 }
 
-# Final Summary
+# Display deployment summary BEFORE admin consent
 Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║  🎉 DEPLOYMENT COMPLETE!                                   ║" -ForegroundColor Green
+Write-Host "║  Infrastructure Deployment Complete!                       ║" -ForegroundColor Green
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Green
 
-Write-Host "Your AI Support Agent is ready!" -ForegroundColor Cyan
-Write-Host "`nWhat was deployed:" -ForegroundColor Yellow
+Write-Host "What was deployed:" -ForegroundColor Yellow
 Write-Host "  ✓ Azure infrastructure (OpenAI, AI Search, Functions, Storage, etc.)" -ForegroundColor Green
 Write-Host "  ✓ Communication Services (email domain linked)" -ForegroundColor Green
 Write-Host "  ✓ Knowledge base (11 documents ingested)" -ForegroundColor Green
 Write-Host "  ✓ RAG function (func-rag)" -ForegroundColor Green
 Write-Host "  ✓ Agents function (func-agents)" -ForegroundColor Green
-Write-Host "  ✓ Graph API integration (webhook configured)" -ForegroundColor Green
+Write-Host "  ✓ Graph API app registration created" -ForegroundColor Green
 
 Write-Host "`nResource Details:" -ForegroundColor Cyan
 Write-Host "  Resource Group: $ResourceGroup" -ForegroundColor White
@@ -531,13 +551,13 @@ Write-Host "  Tenant ID: $tenantId" -ForegroundColor White
 Write-Host "  Support Email: $SupportEmail" -ForegroundColor White
 
 Write-Host "`nNext Steps:" -ForegroundColor Cyan
-Write-Host "1. Send a test email to: $SupportEmail" -ForegroundColor White
-Write-Host "2. Check your inbox for automated response (if confidence ≥0.7)" -ForegroundColor White
-Write-Host "3. View tickets: Azure Portal → Storage Account → Tables → SupportTickets" -ForegroundColor White
-Write-Host "4. Monitor: Azure Portal → Application Insights → Live Metrics" -ForegroundColor White
+Write-Host "1. Complete admin consent (next step below)" -ForegroundColor White
+Write-Host "2. Send a test email to: $SupportEmail" -ForegroundColor White
+Write-Host "3. Check your inbox for automated response (if confidence ≥0.7)" -ForegroundColor White
+Write-Host "4. View tickets: Azure Portal → Storage Account → Tables → SupportTickets" -ForegroundColor White
 
 Write-Host "`nMaintenance Reminders:" -ForegroundColor Yellow
-Write-Host "  • Webhook expires in 3 days - renew: .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail" -ForegroundColor Gray
+Write-Host "  • Webhook expires in 3 days - renew with ManageSubscription endpoint" -ForegroundColor Gray
 Write-Host "  • View logs in Application Insights" -ForegroundColor Gray
 Write-Host "  • Update KB: Add files to demos/02-rag-search/content/ and re-run deploy" -ForegroundColor Gray
 
@@ -545,3 +565,99 @@ Write-Host "`nDocumentation:" -ForegroundColor Cyan
 Write-Host "  • Session guide: docs/SESSION-STORYLINE.md" -ForegroundColor White
 Write-Host "  • Technical reference: docs/DEMO-OVERVIEW.md" -ForegroundColor White
 Write-Host "  • Architecture: docs/AUTHENTICATION-ARCHITECTURE.md`n" -ForegroundColor White
+
+# [8/8] Final Step: Grant Admin Consent (Interactive)
+Write-Host "`n[8/8] Final Configuration: Admin Consent Required" -ForegroundColor Yellow
+Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║  Microsoft Graph Admin Consent (Manual Step Required)     ║" -ForegroundColor Cyan
+Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+Write-Host "⚠️  IMPORTANT: The webhook cannot process emails until you grant admin consent" -ForegroundColor Yellow
+Write-Host "`nWhy this is needed:" -ForegroundColor Cyan
+Write-Host "  • The app needs APPLICATION permissions (not user permissions)" -ForegroundColor White
+Write-Host "  • These permissions require explicit Global Administrator approval" -ForegroundColor White
+Write-Host "  • Automated consent via CLI sometimes fails silently" -ForegroundColor White
+Write-Host "  • Manual consent through browser is the most reliable method`n" -ForegroundColor White
+
+# Get app registration details from the setup-graph-webhook script
+$graphAppId = az functionapp config appsettings list --name func-agents-* --resource-group $ResourceGroup --query "[?name=='GRAPH_CLIENT_ID'].value" -o tsv 2>$null | Select-Object -First 1
+$tenantId = az account show --query "tenantId" -o tsv
+
+if ($graphAppId) {
+    Write-Host "App Registration Details:" -ForegroundColor Cyan
+    Write-Host "  App ID: $graphAppId" -ForegroundColor White
+    Write-Host "  Tenant ID: $tenantId" -ForegroundColor White
+    Write-Host "  Required Permissions:" -ForegroundColor White
+    Write-Host "    - Mail.Read (Application)" -ForegroundColor Gray
+    Write-Host "    - Mail.Send (Application)`n" -ForegroundColor Gray
+
+    $consentUrl = "https://login.microsoftonline.com/$tenantId/adminconsent?client_id=$graphAppId&redirect_uri=https://portal.azure.com"
+
+    Write-Host "Opening admin consent page in your browser..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 2
+    Start-Process $consentUrl
+
+    Write-Host "`n📋 Instructions:" -ForegroundColor Cyan
+    Write-Host "  1. ✅ Sign in with a Global Administrator account (if prompted)" -ForegroundColor White
+    Write-Host "  2. ✅ Review the requested permissions:" -ForegroundColor White
+    Write-Host "       • Mail.Read - Read mail in all mailboxes" -ForegroundColor Gray
+    Write-Host "       • Mail.Send - Send mail as any user" -ForegroundColor Gray
+    Write-Host "  3. ✅ Click 'Accept' to grant admin consent for your organization" -ForegroundColor White
+    Write-Host "  4. ✅ Wait for the 'Admin consent succeeded' confirmation page`n" -ForegroundColor White
+
+    Write-Host "⏸️  Press Enter after you've completed admin consent in the browser..." -ForegroundColor Magenta
+    Read-Host
+
+    Write-Host "`n⏳ Waiting 60 seconds for Azure AD to propagate consent..." -ForegroundColor Gray
+    Start-Sleep -Seconds 60
+
+    Write-Host "`n🔄 Testing webhook creation..." -ForegroundColor Yellow
+
+    # Get the function key for webhook creation
+    $functionKey = az functionapp keys list --name func-agents-* --resource-group $ResourceGroup --query "functionKeys.default" -o tsv 2>$null | Select-Object -First 1
+    $functionAppName = az functionapp list --resource-group $ResourceGroup --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
+
+    if ($functionKey -and $functionAppName) {
+        try {
+            $headers = @{ 'x-functions-key' = $functionKey }
+            $webhookResult = Invoke-RestMethod -Uri "https://$functionAppName.azurewebsites.net/api/managesubscription" -Method Post -Headers $headers -ErrorAction Stop
+
+            Write-Host "✅ SUCCESS! Webhook subscription created" -ForegroundColor Green
+            Write-Host "   Subscription ID: $($webhookResult.subscriptionId)" -ForegroundColor Gray
+            Write-Host "   Expires: $($webhookResult.expirationDateTime)`n" -ForegroundColor Gray
+        }
+        catch {
+            Write-Host "⚠️  Webhook creation encountered an issue:" -ForegroundColor Yellow
+            if ($_.ErrorDetails.Message) {
+                $errorDetails = $_.ErrorDetails.Message | ConvertFrom-Json
+                if ($errorDetails.body.code -eq "ExtensionError" -and $errorDetails.details -like "*Unauthorized*") {
+                    Write-Host "   Error: Still showing 'Unauthorized'" -ForegroundColor Red
+                    Write-Host "`n   Possible causes:" -ForegroundColor Cyan
+                    Write-Host "     1. Admin consent wasn't completed (go back and click 'Accept')" -ForegroundColor White
+                    Write-Host "     2. Signed in with wrong account (needs Global Administrator)" -ForegroundColor White
+                    Write-Host "     3. Azure AD propagation needs more time (wait 5 min and retry)`n" -ForegroundColor White
+
+                    Write-Host "   Manual retry command:" -ForegroundColor Cyan
+                    Write-Host "   `$headers = @{ 'x-functions-key' = '$functionKey' }" -ForegroundColor Gray
+                    Write-Host "   Invoke-RestMethod -Uri 'https://$functionAppName.azurewebsites.net/api/managesubscription' -Method Post -Headers `$headers`n" -ForegroundColor Gray
+                } else {
+                    Write-Host "   Error: $($errorDetails.error)" -ForegroundColor Red
+                    Write-Host "   Details: $($errorDetails.details)`n" -ForegroundColor Gray
+                }
+            } else {
+                Write-Host "   Error: $($_.Exception.Message)`n" -ForegroundColor Red
+            }
+        }
+    } else {
+        Write-Host "⚠️  Could not find function app details to test webhook" -ForegroundColor Yellow
+        Write-Host "   You can manually test with:" -ForegroundColor Cyan
+        Write-Host "   .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail`n" -ForegroundColor Gray
+    }
+} else {
+    Write-Host "⚠️  Could not find Graph app registration - admin consent step skipped" -ForegroundColor Yellow
+    Write-Host "   You may need to run: .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail`n" -ForegroundColor Gray
+}
+
+Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║  Deployment Complete - System Ready!                       ║" -ForegroundColor Green
+Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Green

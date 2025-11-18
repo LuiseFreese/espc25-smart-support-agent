@@ -2,26 +2,43 @@
 
 ## Project Overview
 
-This repository demonstrates building an **autonomous IT support agent** using Azure AI Foundry with 4 progressive demos:
+An **event-driven IT support automation system** that processes support emails, classifies them, searches a knowledge base, and automatically responds or escalates based on confidence scores.
 
-1. **Demo 01:** Ticket triage (keyword-based classification)
-2. **Demo 02:** RAG search with Azure AI Search
-3. **Demo 03:** Agent with function calling (tool use)
-4. **Demo 04:** Production email processing system (event-driven webhooks)
+### Five Progressive Demos
 
-**Core Stack:** Azure AI Foundry • Azure OpenAI • Azure AI Search • Azure Functions • Table Storage • Application Insights
+1. **Demo 01: Triage** - Keyword-based classification (Network/Access/Billing/Software)
+2. **Demo 02: RAG Search** - Knowledge base retrieval with confidence scoring
+3. **Demo 03: Agent Tools** - Function calling patterns for extensibility
+4. **Demo 04: Production** - Complete email automation (MAIN SYSTEM)
+5. **Demo 05: Copilot Plugin** - Triage + RAG endpoints for Copilot Studio (deployed to func-agents)
 
-**Deployment:** Sweden Central region
+**Tech Stack:** Azure AI Foundry • Azure OpenAI (GPT-4o-mini) • Azure AI Search • Azure Functions (Node.js 20 + Python 3.11) • Table Storage • Application Insights
 
-## Key Architecture Concepts
+**Region:** Sweden Central (required for GPT-4o-mini)
 
-- **Event-Driven:** Microsoft Graph webhooks for instant email processing
-- **Hybrid Email:** Graph API for reading, Azure Communication Services for sending
-- **Keyword Triage:** Fast, deterministic classification (Network, Access, Billing, Software)
-- **RAG with Confidence:** Azure AI Search semantic ranking maps to confidence scores (0.1-0.95)
-- **Table Storage:** All tickets persisted with unique IDs (TKT-YYYYMMDD-XXXXXX)
-- **Duplicate Prevention:** EmailMessageId as RowKey enforces uniqueness
-- **Infrastructure as Code:** Bicep templates for all Azure resources
+## Key Architecture Patterns
+
+**Email Processing:**
+- **Inbound:** Microsoft Graph webhooks (real-time, event-driven)
+- **Outbound:** Azure Communication Services (compatible with all M365 tenants)
+- **Deduplication:** EmailMessageId stored as Table Storage RowKey (prevents duplicate processing)
+
+**AI Decision Pipeline:**
+- **Step 1 - Triage:** Keyword matching → Category + Priority (fast, deterministic)
+- **Step 2 - RAG Search:** Hybrid vector + semantic search → Answer + Confidence (0.1-0.95)
+- **Step 3 - Route:** Confidence ≥0.7 = Auto-reply | <0.7 = Escalate to human
+
+**Data & Storage:**
+- **Tickets:** Table Storage with format `TKT-YYYYMMDD-XXXXXX` (PartitionKey='TICKET')
+- **Knowledge Base:** 11 markdown docs → Azure AI Search index (1536-dim embeddings)
+
+**Security:**
+- **Production:** Managed Identity (no secrets) for Azure OpenAI, AI Search, Key Vault
+- **External Services:** API keys for Microsoft Graph, Communication Services (stored in Key Vault)
+
+**Infrastructure:**
+- **IaC:** Bicep templates (subscription-level deployment)
+- **Runtimes:** Node.js 20 (orchestration) + Python 3.11 (RAG endpoint)
     subgraph "Event-Driven Production Flow"
         A[New Email Arrives] -->|Real-time| B[Microsoft Graph<br/>Change Notification]
         B -->|Webhook POST| C[GraphWebhook<br/>Azure Function]
@@ -73,23 +90,53 @@ The current keyword-based triage (in `AIService.ts`) scans email body for:
 
 **Test Results**: 100% accuracy on VPN, Password, Billing scenarios.
 
+### RAG Confidence Scoring (How Auto-Reply Decisions Work)
+
+The system decides whether to auto-reply or escalate based on **search quality scores**:
+
+**How It Works:**
+1. User question → Convert to 1536-dim embedding (text-embedding-3-large)
+2. Azure AI Search performs **hybrid search** (vector + semantic ranking, k=50)
+3. Top result gets a `@search.rerankerScore` (Azure's semantic ranker, range 0-4)
+4. Score maps to confidence:
+   - **3.0+** → 0.95 (excellent match - auto-reply)
+   - **2.5-3.0** → 0.85 (strong match - auto-reply)
+   - **2.0-2.5** → 0.75 (good match - auto-reply)
+   - **1.5-2.0** → 0.60 (moderate - escalate to human)
+   - **<1.5** → 0.30 (poor/fallback - escalate)
+
+**Decision Threshold:** Confidence ≥0.7 triggers auto-reply
+
+**Why This Matters:** Without proper RAG_API_KEY configuration, system returns 0.3 (fallback) and escalates everything.
+
+**Implementation:** `demos/02-rag-search/rag-function/function_app.py` lines 80-150
+
 ## Repository Structure
 
 ```
 demos/
 ├── 01-triage-promptflow/      # Keyword classification
 ├── 02-rag-search/              # Knowledge base + RAG search
+│   ├── content/                # 11 KB markdown docs
+│   ├── ingest/                 # TypeScript ingestion (Azure SDK)
+│   └── rag-function/           # Python HTTP endpoint (deployed)
 ├── 03-agent-with-tools/        # Function calling demo
-└── 04-real-ticket-creation/    # Production email system
-    └── function/src/
-        ├── functions/          # Azure Functions endpoints
-        ├── services/           # Business logic
-        └── models/             # TypeScript types
+├── 04-real-ticket-creation/    # Production email system (MAIN)
+│   └── function/src/
+│       ├── functions/          # Azure Functions endpoints
+│       ├── services/           # Business logic (AIService, TableStorageService, etc.)
+│       └── models/             # TypeScript types
+└── 05-triage-plugin/           # Copilot Studio integration
 
 infra/
 ├── main.bicep              # Main infrastructure template
 ├── parameters.dev.json     # Environment config
 └── modules/                # Individual resource modules
+
+scripts/
+├── deploy.ps1              # One-command deployment (MAIN)
+├── setup-graph-webhook.ps1 # App registration + webhook creation
+└── verify-deployment.ps1   # Health check
 
 tests/                      # Test scenarios and scripts
 docs/                       # Architecture documentation
@@ -98,52 +145,90 @@ docs/                       # Architecture documentation
 ## Coding Conventions
 
 - **TypeScript:** Azure Functions v4 model, compile before deploy (`npm run build`)
+- **Python:** RAG endpoint uses Azure SDK patterns (SearchClient, AzureOpenAI)
 - **Auth Levels:** `'function'` for production (requires x-functions-key), `'anonymous'` for webhooks
 - **Environment Variables:** `AZURE_*` or `GRAPH_*` prefix
 - **Bicep:** Use `@secure()` for secrets, Managed Identity for service-to-service auth
+- **Table Storage Keys:** PartitionKey always `'TICKET'`, RowKey is sanitized EmailMessageId or generated ID
+- **RAG Search Pattern:** Hybrid search (vector + semantic) with k=50 for RRF fusion
 
 ## Essential Commands
 
 ### Local Development
+
+**TypeScript Functions (Demo 04 - Main System):**
 ```bash
 # Setup
 az login && az account set -s <subscription-id>
 npm install -g typescript azure-functions-core-tools@4
 
-# Build function
+# Build and run locally
 cd demos/04-real-ticket-creation/function
 npm install
 npm run build
-
-# Test locally
 func start
 
 # Deploy to Azure
-func azure functionapp publish func-agents-dw7z4hg4ssn2k
+func azure functionapp publish func-agents-<uniqueid>
 ```
 
+**Python RAG Function (Demo 02 - Search Endpoint):**
+```powershell
+# Setup Python environment
+cd demos/02-rag-search/rag-function
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Configure local settings
+cp local.settings.json.example local.settings.json
+# Edit local.settings.json with:
+# - AZURE_AI_SEARCH_ENDPOINT
+# - AZURE_AI_SEARCH_API_KEY
+# - AZURE_OPENAI_ENDPOINT
+# - AZURE_OPENAI_API_KEY (or use Managed Identity)
+
+# Run locally
+func start
+
+# Test endpoint
+curl -X POST http://localhost:7071/api/rag-search `
+  -H "Content-Type: application/json" `
+  -d '{"question": "How do I reset my password?"}'  
+
+# Deploy to Azure
+func azure functionapp publish func-rag-<uniqueid>
+```
+
+**Key Difference:** Python function uses Azure SDK patterns (SearchClient, AzureOpenAI client) vs TypeScript uses REST API calls
+
 ### Deployment
-```bash
-# Deploy infrastructure
+```powershell
+# One-command deployment (RECOMMENDED - 15 minutes hands-off)
+.\scripts\deploy.ps1 -SubscriptionId "<your-sub-id>" -SupportEmail "support@domain.com"
+
+# Manual step-by-step:
+
+# 1. Deploy infrastructure
 cd infra
 az deployment sub create \
   --location westeurope \
   --template-file main.bicep \
   --parameters @parameters.dev.json
 
-# Link Communication Services domain (REQUIRED)
+# 2. Link Communication Services domain (REQUIRED)
 cd ..\scripts
 .\post-deploy-communication-services.ps1 -ResourceGroup rg-smart-agents-dev
 
-# Configure Graph webhook (auto-configures RAG_API_KEY!)
+# 3. Configure Graph webhook (auto-configures RAG_API_KEY!)
 .\setup-graph-webhook.ps1 -ResourceGroup rg-smart-agents-dev -SupportEmail support@domain.com
 
-# Deploy function code
+# 4. Deploy function code
 cd ..\demos\04-real-ticket-creation\function
 npm install && npm run build
 func azure functionapp publish func-agents-<uniqueid>
 
-# Verify deployment
+# 5. Verify deployment
 cd ..\..\scripts
 .\verify-deployment.ps1 -ResourceGroup rg-smart-agents-dev
 ```
@@ -154,9 +239,85 @@ cd ..\..\scripts
 |------|--------|
 | Add new Azure Function | Create in `src/functions/`, register in `src/index.ts` |
 | Update triage logic | Modify `AIService.ts` → `keywordBasedTriage()` |
-| Add KB document | Add markdown to `demos/02-rag-search/content/`, run `ingest-kb.py` |
+| Add KB document | See "Knowledge Base Update Process" below |
 | Update infrastructure | Modify `infra/modules/*.bicep`, redeploy with `az deployment sub create` |
 | Renew webhook (expires 3 days) | POST to `/api/managesubscription` endpoint |
+
+### Knowledge Base Update Process
+
+To add or update support documentation:
+
+1. **Add/Edit Markdown File:**
+   ```powershell
+   # Create new file in content directory
+   cd demos/02-rag-search/content
+   # Add your .md file (e.g., new-guide.md)
+   ```
+
+2. **Run Ingestion Script:**
+   ```powershell
+   cd demos/02-rag-search
+   # Using Python script:
+   python ingest-kb.py
+   
+   # OR using TypeScript ingestion tool:
+   cd ingest
+   npm install
+   npm run dev
+   ```
+
+3. **What Happens:**
+   - Script reads all .md files from `content/` directory
+   - Chunks content into searchable segments
+   - Generates 1536-dim embeddings via Azure OpenAI (text-embedding-3-large)
+   - Uploads to Azure AI Search index `kb-support`
+   - Creates vector index with semantic configuration
+
+4. **Verify:**
+   ```powershell
+   # Test RAG search with your new content
+   .\.\tests\test-demo02-rag.ps1
+   ```
+
+**Current KB:** 11 documents covering VPN, passwords, billing, software installation
+
+## Testing & Verification
+
+### Test Email Scenarios
+Located in `sample-data/tickets/TEST-EMAIL-SCENARIOS.md`:
+- **VPN Issue:** "My VPN keeps disconnecting every 5 minutes" → Category: Network, Priority: Medium
+- **Password Reset:** "I can't log in, forgot my password" → Category: Access, Priority: Medium
+- **Billing Query:** "Double charged on my last invoice" → Category: Billing, Priority: High
+
+### Quick Health Checks
+```powershell
+# Verify full deployment
+.\scripts\verify-deployment.ps1 -ResourceGroup rg-smart-agents-dev
+
+# Check webhook status
+curl https://func-agents-<id>.azurewebsites.net/api/managesubscription?code=<key>
+
+# Test RAG endpoint directly
+curl -X POST https://func-rag-<id>.azurewebsites.net/api/rag-search \
+  -H "x-functions-key: <key>" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How to reset password?"}'
+
+# Test storage connectivity
+curl https://func-agents-<id>.azurewebsites.net/api/ping-storage
+```
+
+### Running Automated Tests
+```powershell
+# E2E test (requires deployed system)
+.\tests\e2e-test.ps1
+
+# Test RAG search (local or deployed)
+.\tests\test-demo02-rag.ps1
+
+# Check semantic search configuration
+.\tests\check-semantic-search.ps1
+```
 
 ## Troubleshooting
 
@@ -180,4 +341,29 @@ cd ..\..\scripts
 - **GraphWebhook Auth:** Uses `authLevel: 'anonymous'` (required for Microsoft Graph validation)
 - **Other Endpoints:** Use `authLevel: 'function'` (requires function key)
 - **Managed Identity:** Use for Azure resource access (no API keys)
+
+## Authentication Architecture
+
+**Production uses TWO authentication patterns:**
+
+1. **Managed Identity (Service-to-Service)** - PREFERRED
+   - Function App → Azure OpenAI: `Cognitive Services OpenAI User` role
+   - Function App → Azure AI Search: `Search Index Data Reader` role
+   - Function App → Key Vault: Access policy for secrets
+   - **No secrets stored** - tokens managed by Azure
+   - Configured in `infra/modules/role-assignments.bicep`
+
+2. **API Keys (External Services)**
+   - Microsoft Graph: App registration with `Mail.Read` + `Mail.Send` permissions
+   - Communication Services: Connection string (stored in Key Vault)
+   - RAG Function: x-functions-key for cross-function calls
+
+**Development Portal Access:**
+- Optional: Set `currentUserObjectId` in Bicep parameters to view Key Vault secrets
+- Get object ID: `(Get-AzADUser -UserPrincipalName user@domain.com).Id`
+
+**Key Files:**
+- `docs/AUTHENTICATION-ARCHITECTURE.md` - Complete authentication guide
+- `infra/modules/role-assignments.bicep` - RBAC configuration
+- `scripts/setup-graph-webhook.ps1` - Graph API app registration
 

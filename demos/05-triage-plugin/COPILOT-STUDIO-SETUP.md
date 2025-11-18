@@ -1,6 +1,6 @@
-# Copilot Studio Setup Guide - Triage Plugin
+# Copilot Studio Setup Guide - Smart Support Assistant
 
-Complete guide for configuring the Triage Plugin in Microsoft Copilot Studio.
+Complete guide for configuring the Smart Support Assistant with RAG-powered answers and triage classification in Microsoft Copilot Studio.
 
 ---
 
@@ -8,32 +8,51 @@ Complete guide for configuring the Triage Plugin in Microsoft Copilot Studio.
 
 ### Your Credentials
 
-**Function App:** `func-triage-<uniqueid>`
+**Function App:** `func-agents-<uniqueid>`
 
 **Get Function Key:**
 ```powershell
-az functionapp keys list --name func-triage-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
+az functionapp keys list --name func-agents-<uniqueid> --resource-group rg-smart-agents-dev --query "functionKeys.default" -o tsv
 ```
 
-**Function URL:** `https://func-triage-<uniqueid>.azurewebsites.net/api/triage`
+**API Endpoints:**
+- **Answer (RAG):** `https://func-agents-<uniqueid>.azurewebsites.net/api/answer`
+- **Triage:** `https://func-agents-<uniqueid>.azurewebsites.net/api/triage`
 
 **OpenAPI File:** `triage-api.yaml` (in this folder)
+
+**Note:** These endpoints are deployed alongside the email processing endpoints (Demo 04) in the same function app.
 
 ### 📋 Quick Setup Steps
 1. Open https://copilotstudio.microsoft.com/
 2. Select/Create agent
 3. Tools → Add tool → REST API
-4. Upload `triage-api.yaml`
+4. Upload `triage-api.yaml` (includes both endpoints)
 5. **Create Connection** (when prompted):
-   - Connection name: `DemoConnection`
+   - Connection name: `SupportAPIConnection`
    - Authentication type: **API Key**
    - Header name: `x-functions-key`
    - Header value: (paste your function key from above command)
-6. Name: `TriageClassifier`
-7. Description: `Classifies support tickets into category and priority`
+6. Configure two tools:
+   - **AnswerGenerator** - Primary tool for KB answers
+   - **TriageClassifier** - Secondary tool for categorization
+7. Update agent instructions (see below)
 8. **Test** with: "My VPN keeps disconnecting"
 9. **Publish**
 10. Test in conversation
+
+---
+
+## What's New in Version 2.0
+
+This setup now includes **RAG-powered answers** in addition to triage classification:
+
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| **AnswerGenerator** (`/api/answer`) | Searches KB and returns AI-generated answer with confidence score | **Primary** - Use first for all user questions |
+| **TriageClassifier** (`/api/triage`) | Categorizes into Network/Access/Billing/Software + Priority | **Secondary** - For analytics and routing |
+
+**Key Benefit:** Bot can now provide actual solutions from your knowledge base, not just classify tickets!
 
 ---
 
@@ -207,54 +226,119 @@ Automated IT support assistant that helps users with technical issues. Specializ
 
 #### Agent Instructions
 
-Copy these instructions into your agent's instruction field:
+**IMPORTANT:** Copy the instructions from `COPILOT-AGENT-INSTRUCTIONS.md` - they enforce mandatory tool usage.
+
+**Quick copy version:**
 
 ```
-You are a helpful IT support assistant. Your role is to help users resolve technical issues quickly and professionally.
+You are an intelligent IT support assistant powered by a knowledge base and classification system.
 
-## Your Capabilities
-- Classify support tickets into categories (Network, Access, Billing, Software, Other)
-- Determine priority levels (High, Medium, Low)
-- Provide troubleshooting steps for common issues
-- Route urgent issues to human support when needed
+YOUR TWO TOOLS (BOTH REQUIRED FOR EVERY QUESTION)
 
-## How to Handle Requests
+1. AnswerGenerator - CALL FIRST with user's question → Returns answer + confidence + source + sourceUrl
+2. TriageClassifier - CALL SECOND with user's question → Returns category + priority
 
-1. **Listen carefully** to the user's problem
-2. **Use the TriageClassifier tool** to categorize the issue automatically
-3. **Acknowledge** the category and priority: "I see this is a [category] issue with [priority] priority"
-4. **Provide initial help**:
-   - For VPN/Network issues: Suggest checking connection, restarting router, verifying VPN credentials
-   - For Access/Password issues: Guide through password reset process, check account status
-   - For Billing questions: Direct to billing portal or escalate to finance team
-   - For Software issues: Provide installation guides or troubleshooting steps
+MANDATORY WORKFLOW FOR EVERY USER REQUEST
 
-## Priority Handling
-- **HIGH priority** (urgent, critical, emergency): Immediately offer to escalate to human support
-- **MEDIUM priority**: Provide standard troubleshooting and self-service options
-- **LOW priority**: Offer help but set expectations for response time
+Step 1: Call AnswerGenerator(question=user's full question text)
+Step 2: Evaluate confidence from response (0.0 to 1.0)
+Step 3: Present answer to user:
+  - High confidence (≥0.7): Show full answer + 📚 Source + 🔗 sourceUrl
+  - Low confidence (<0.7): Show answer + acknowledge uncertainty + 📚 Source + 🔗 sourceUrl + offer escalation
+Step 4: Call TriageClassifier(ticket_text=user's full question text)
+Step 5: Say: "I've recorded this as a [category] issue with [priority] priority"
+Step 6: Offer next steps (escalation for HIGH/low confidence, or "Did this help?")
 
-## Tone & Style
-- Professional but friendly
-- Clear and concise
-- Empathetic to user frustration
-- Solution-focused
+CRITICAL RULES
+✅ ALWAYS call AnswerGenerator FIRST
+✅ ALWAYS call TriageClassifier SECOND
+✅ ALWAYS show sourceUrl with 🔗 emoji (it's in the response!)
+✅ NEVER answer without calling tools
+✅ NEVER skip classification
 
-## When to Escalate
-- User explicitly requests human support
-- Issue remains unresolved after 2-3 troubleshooting attempts
-- HIGH priority issues that need immediate attention
-- Billing disputes or complex account issues
-
-## Example Conversation Flow
-User: "My VPN keeps disconnecting every 5 minutes"
-You: [Use TriageClassifier tool]
-You: "I see this is a Network issue with Medium priority. Let me help you troubleshoot your VPN connection. First, let's try these steps:
-1. Disconnect and reconnect your VPN
-2. Check if your internet connection is stable
-3. Restart your device
-Have you tried any of these yet?"
+EXAMPLE:
+User: "My VPN keeps disconnecting"
+1. [Call AnswerGenerator] → answer="6 steps...", confidence=0.85, source="VPN Guide", sourceUrl="https://github.com/..."
+2. "Here's what you need to do: [paste answer] 📚 Source: VPN Guide 🔗 https://github.com/..."
+3. [Call TriageClassifier] → category="Network", priority="Medium"
+4. "I've recorded this as a Network issue with Medium priority. Did this solve your problem?"
 ```
+
+**Full detailed instructions:** See `COPILOT-AGENT-INSTRUCTIONS.md` for complete workflow and examples.
+
+---
+
+### STEP 11: Configure Both Tools in Copilot Studio
+
+**CRITICAL:** You need BOTH tools configured for the agent to work correctly.
+
+**Add Tool 1: AnswerGenerator**
+1. Tools → + Add tool → REST API
+2. Upload `triage-api.yaml`
+3. When prompted, select the `answer` operation (POST /api/answer)
+4. Use the same connection (API key) from earlier
+5. Name: `AnswerGenerator`
+6. Description: `Searches the knowledge base and returns AI-generated answers with confidence scores and source documentation`
+7. Save and test with: `{"question": "How do I reset my password?"}`
+
+**Add Tool 2: TriageClassifier**
+1. Tools → + Add tool → REST API
+2. Upload `triage-api.yaml` again (or reuse if available)
+3. Select the `triage` operation (POST /api/triage)
+4. Use the same connection
+5. Name: `TriageClassifier`
+6. Description: `Classifies support tickets into category (Network/Access/Billing/Software) and priority (High/Medium/Low)`
+7. Save and test with: `{"ticket_text": "My VPN keeps disconnecting"}`
+
+---
+
+### STEP 12: Verify Tools Work
+
+Before testing the full agent, verify each tool independently:
+
+**Test AnswerGenerator:**
+```json
+Input: {"question": "How do I reset my password?"}
+Expected Output: {
+  "answer": "Step-by-step password reset instructions...",
+  "confidence": 0.8,
+  "source": "Password Reset",
+  "sourceUrl": "https://github.com/LuiseFreese/espc25-smart-support-agent/blob/main/demos/02-rag-search/content/password-reset.md"
+}
+```
+
+**Test TriageClassifier:**
+```json
+Input: {"ticket_text": "My VPN keeps disconnecting"}
+Expected Output: {
+  "category": "Network",
+  "priority": "Medium"
+}
+```
+
+---
+
+### STEP 13: Test Full Agent Conversation
+
+1. Go to **Test** panel (top-right)
+2. Type: `"My VPN keeps disconnecting"`
+
+**Expected agent behavior:**
+1. Agent calls AnswerGenerator
+2. Agent displays the answer with troubleshooting steps
+3. Agent shows: `📚 Source: VPN Comprehensive Guide`
+4. Agent shows: `🔗 https://github.com/.../vpn-comprehensive-guide.md`
+5. Agent calls TriageClassifier
+6. Agent says: `"I've recorded this as a Network issue with Medium priority"`
+7. Agent asks: `"Did this solve your problem?"`
+
+**If agent doesn't use the tools:**
+- Agent instructions aren't strict enough
+- Copy the **condensed version** from COPILOT-AGENT-INSTRUCTIONS.md
+- Make sure it starts with "ALWAYS call AnswerGenerator FIRST"
+- Check that both tools are published and enabled
+
+---
 
 #### Suggested Conversation Starters
 
