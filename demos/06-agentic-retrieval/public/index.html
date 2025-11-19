@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Support Agent Demos</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/App.tsx"></script>
+</body>
+</html>
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <h1>🤖 AI Support Agent Demos</h1>
+                <p class="subtitle">Powered by Azure OpenAI & AI Search</p>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('demo06')">
+                <span class="tab-icon">🔍</span>
+                Demo 06: Agentic Retrieval
+            </button>
+            <button class="tab-button" onclick="switchTab('demo07')">
+                <span class="tab-icon">🤖</span>
+                Demo 07: Multi-Agent
+            </button>
+        </div>
+
+        <!-- Demo 06 Panel -->
+        <div class="tab-panel active" id="demo06-panel">
+            <div class="demo-content">
+                <h2>🔍 Agentic Retrieval</h2>
+                <p class="description">Query decomposition → Parallel search → Citation-based merging</p>
+
+                <!-- Search Form -->
+                <form id="search-form-06" class="search-form">
+                    <input
+                        type="text"
+                        id="question-input-06"
+                        class="search-input"
+                        placeholder="Ask a complex question that requires multiple sources..."
+                        required>
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+
+                <!-- Example Questions -->
+                <div class="examples">
+                    <p><strong>Try these examples:</strong></p>
+                    <button class="example-btn" onclick="fillQuestion('06', 'How do I fix VPN disconnection issues and what MTU settings should I use?')">
+                        🔧 VPN + MTU Settings
+                    </button>
+                    <button class="example-btn" onclick="fillQuestion('06', 'How do I reset my password and what should I do if my account gets locked out?')">
+                        🔑 Password + Account Lockout
+                    </button>
+                    <button class="example-btn" onclick="fillQuestion('06', 'How do I install software and troubleshoot billing issues?')">
+                        💳 Software + Billing
+                    </button>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading-06" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Processing your question...</p>
+                </div>
+
+                <!-- Results -->
+                <div id="results-06" style="display: none;">
+                    <div id="queries-section-06" class="section" style="display: none;">
+                        <h3>🤔 Query Planning</h3>
+                        <div id="queries-content-06" class="queries-list"></div>
+                    </div>
+
+                    <div id="answer-section-06" class="section" style="display: none;">
+                        <h3>✨ Final Answer</h3>
+                        <div id="answer-content-06" class="answer-card"></div>
+                    </div>
+
+                    <div id="passages-section-06" class="section" style="display: none;">
+                        <h3>📚 Retrieved Passages</h3>
+                        <div id="passages-content-06" class="passages-list"></div>
+                    </div>
+
+                    <div id="error-section-06" class="section error-section" style="display: none;">
+                        <h3>⚠️ Error</h3>
+                        <div id="error-content-06"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo 07 Panel -->
+        <div class="tab-panel" id="demo07-panel">
+            <div class="demo-content">
+                <h2>🤖 Multi-Agent Orchestration</h2>
+                <p class="description">Triage → Route to specialized agents → Create tickets if needed</p>
+
+                <form id="search-form-07" class="search-form">
+                    <input
+                        type="text"
+                        id="question-input-07"
+                        class="search-input"
+                        placeholder="Ask a support question..."
+                        required>
+                    <button type="submit" class="search-button">Ask</button>
+                </form>
+
+                <div class="examples">
+                    <p><strong>Try these examples:</strong></p>
+                    <button class="example-btn" onclick="fillQuestion('07', 'How do I reset my password?')">
+                        🔑 Password Reset
+                    </button>
+                    <button class="example-btn" onclick="fillQuestion('07', 'My VPN keeps disconnecting')">
+                        🔧 VPN Issue
+                    </button>
+                    <button class="example-btn" onclick="fillQuestion('07', 'I was charged twice')">
+                        💳 Billing Issue
+                    </button>
+                </div>
+
+                <div id="loading-07" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Processing through agents...</p>
+                </div>
+
+                <div id="results-07" style="display: none;">
+                    <div id="triage-section-07" class="section" style="display: none;">
+                        <h3>🎯 Triage Result</h3>
+                        <div id="triage-content-07" class="triage-info"></div>
+                    </div>
+
+                    <div id="agents-section-07" class="section" style="display: none;">
+                        <h3>🔄 Agent Flow</h3>
+                        <div id="agents-content-07" class="agents-flow"></div>
+                    </div>
+
+                    <div id="response-section-07" class="section" style="display: none;">
+                        <h3>✨ Response</h3>
+                        <div id="response-content-07" class="answer-card"></div>
+                    </div>
+
+                    <div id="ticket-section-07" class="section ticket-section" style="display: none;">
+                        <h3>🎫 Ticket Created</h3>
+                        <div id="ticket-content-07" class="ticket-info"></div>
+                    </div>
+
+                    <div id="error-section-07" class="section error-section" style="display: none;">
+                        <h3>⚠️ Error</h3>
+                        <div id="error-content-07"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app-unified.js"></script>
+</body>
+</html>

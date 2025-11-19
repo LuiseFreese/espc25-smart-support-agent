@@ -44,9 +44,8 @@ var userOpenAIRoleAssignmentName = guid(openAIAccount.id, userObjectId, cognitiv
 var userSearchRoleAssignmentName = guid(searchService.id, userObjectId, searchIndexDataReaderRoleId, deploymentIdentifier)
 
 // Grant Function App access to Azure OpenAI
-// Note: Will fail with RoleAssignmentExists on redeployment - this is expected Bicep behavior
-// The role assignment exists and has the same configuration, so the error can be ignored
-resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+// Note: Uses deterministic GUID to be idempotent across deployments
+resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments) {
   name: openAIRoleAssignmentName
   scope: openAIAccount
   properties: {
@@ -58,7 +57,7 @@ resource openAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 
 // Grant Function App access to Azure AI Search
-resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource searchRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments) {
   name: searchRoleAssignmentName
   scope: searchService
   properties: {

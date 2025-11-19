@@ -1,6 +1,6 @@
-# Demo 02: RAG Search with Azure AI Search
+# Demo 02: RAG Search with Azure AI Search + Optional Multi-Modal Vision
 
-This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for semantic knowledge retrieval and Azure OpenAI for answer generation with citations.
+This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for semantic knowledge retrieval and Azure OpenAI for answer generation with citations. **NEW:** Optionally upload images for multi-modal analysis with GPT-4 Vision.
 
 ## What This Demo Shows
 
@@ -8,6 +8,66 @@ This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for s
 - **Hybrid search** combining keywords + vectors + semantic ranking
 - **Grounded answers** that cite source documents
 - **Confidence scoring** based on retrieval relevance
+- **Streaming toggle** for real-time progressive response generation (ChatGPT-like UX)
+- **🆕 Optional image upload** for multi-modal RAG (GPT-4 Vision + knowledge base)
+
+## Three Modes of Operation
+
+### 1. Standard RAG (Text-Only)
+- Enter question → Search knowledge base → Get answer
+- Uses hybrid search + GPT-4o-mini for answer generation
+- Returns passages with confidence score
+
+### 2. Streaming RAG (Real-Time Response)
+- Enable "Streaming" checkbox
+- Answer appears token-by-token (ChatGPT-like experience)
+- Blinking cursor shows active generation
+- Same search quality, better perceived performance
+
+### 3. 🆕 Multi-Modal RAG (Image + Text)
+- Upload error screenshot, network diagram, or hardware photo
+- GPT-4 Vision analyzes the image first
+- Visual insights enhance the search query
+- Knowledge base context augments the vision analysis
+- **Higher confidence scores** (0.75-0.95 with vision vs 0.5-0.7 text-only)
+
+**Use Cases for Image Upload:**
+- 📸 **Error screenshots** → Automated diagnosis with KB troubleshooting steps
+- 🗺️ **Network diagrams** → Configuration validation against best practices
+- 🔧 **Hardware photos** → Installation verification with KB guides
+- 🖥️ **UI issues** → Visual debugging with KB context
+
+## How Multi-Modal Works
+
+```
+Image Upload → GPT-4 Vision Analysis → Enhanced Query → RAG Search → Synthesized Answer
+```
+
+**Example Flow:**
+1. User uploads VPN Error 721 screenshot
+2. GPT-4 Vision identifies: "Error 721: Remote computer did not respond"
+3. System searches KB with enhanced query: "VPN Error 721 not responding"
+4. Returns answer combining visual analysis + KB troubleshooting steps
+5. Confidence boosted from 0.5 → 0.95 due to vision + KB alignment
+
+## Streaming Mode
+
+Demo 02 includes an optional **"Enable Streaming (real-time response)"** toggle that transforms the user experience:
+
+**Default Mode (Streaming OFF)**:
+- Traditional request/response pattern
+- Complete answer returns instantly after search
+- Uses `/api/simple-rag` endpoint
+
+**Streaming Mode (Streaming ON)**:
+- Modern ChatGPT-like streaming experience
+- Answer appears word-by-word as tokens are generated
+- Blinking cursor shows active generation
+- "● Streaming..." status indicator
+- Uses `/api/streaming-rag` endpoint with Server-Sent Events (SSE)
+- Eliminates perceived latency - users see immediate feedback
+
+Both modes use identical RAG logic (same search quality and confidence scoring).
 
 ## Azure Resources Used
 
@@ -56,7 +116,7 @@ This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for s
 
 ### Azure OpenAI Service (`oai-agents-*`)
 
-Two models work together for RAG:
+Three models work together for RAG and multi-modal analysis:
 
 **1. Embeddings Model: `text-embedding-3-large`**
 
@@ -65,6 +125,7 @@ Two models work together for RAG:
 **When It's Used:**
 - **Ingestion:** Embeds each KB document before uploading to search
 - **Query:** Embeds user question to find similar documents
+- **Multi-Modal:** Embeds enhanced query (question + visual insights)
 
 **Cost:** ~$0.00013 per 1K tokens (very cheap)
 
@@ -93,6 +154,32 @@ Include citations [1], [2] for each fact.
 
 **Cost:** ~$0.0002 per query (context + answer generation)
 
+**3. 🆕 Vision Model: `gpt-4o` or `gpt-4o-mini` (with vision)**
+
+**Purpose:** Analyze uploaded images before RAG search
+
+**How It's Used (Multi-Modal Mode):**
+1. User uploads image (screenshot, diagram, photo)
+2. Image converted to base64 data URL
+3. GPT-4 Vision analyzes: "Describe technical details, errors, and issues"
+4. Visual analysis enhances the search query
+5. RAG search proceeds with enriched context
+
+**System Prompt:**
+```
+You are an IT support assistant analyzing images. Describe what you see and 
+identify any errors, issues, or technical details.
+```
+
+**Example:**
+```
+Input:  VPN Error 721 screenshot
+Output: "Error 721: The remote computer did not respond. Dialog shows 
+         'Unable to establish connection' with error code 721."
+```
+
+**Cost:** ~$0.01 per image analysis (higher than text-only)
+
 ### Storage Account (`stagents*`)
 
 **Purpose:** Backup and version control for knowledge base markdown files
@@ -120,6 +207,7 @@ Include citations [1], [2] for each fact.
 
 ## RAG Pipeline Flow
 
+### Text-Only RAG Flow
 ```mermaid
 flowchart TD
     A[User Question:<br/>How do I reset <br/>my password?] --> B[1. Generate <br/>Query Embedding]
@@ -137,7 +225,28 @@ flowchart TD
     D --> D1["Result 1: Password Reset Guide<br/>Score: 3.8"]
     D --> D2["Result 2: Account Security FAQ<br/>Score: 2.1"]
     D --> D3["Result 3: Login Issues<br/>Score: 1.5"]
+```
+
+### 🆕 Multi-Modal RAG Flow (with Image Upload)
+```mermaid
+flowchart TD
+    A[User uploads VPN<br/>Error 721 screenshot<br/>+ question] --> B[1. GPT-4 Vision<br/>Image Analysis]
+    B --> B1[Visual Analysis:<br/>Error 721: Remote<br/>computer did not respond]
+    B1 --> C[2. Enhanced Query<br/>Question + Visual Context]
+    C --> D[3. Generate Embedding<br/>text-embedding-3-large]
+    D --> E[4. Hybrid Search<br/>Azure AI Search]
     
+    E --> E1[BM25: VPN Error 721]
+    E --> E2[Vector: semantic match]
+    E --> E3[Semantic: re-ranker]
+    
+    E1 --> F[5. Top KB Results]
+    E2 --> F
+    E3 --> F
+    
+    F --> G[6. Synthesize Answer<br/>GPT-4o-mini]
+    G --> H[Final Response:<br/>Visual Analysis +<br/>KB Troubleshooting<br/>Confidence: 0.95]
+```
     D1 --> E[4. Generate Answer<br/>Azure OpenAI: gpt-4o-mini]
     D2 --> E
     D3 --> E

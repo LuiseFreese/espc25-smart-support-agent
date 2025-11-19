@@ -136,7 +136,7 @@ async function executeToolCall(toolCall: ToolCall): Promise<string> {
   const { name, arguments: argsStr } = toolCall.function;
   const args = JSON.parse(argsStr);
 
-  console.log(`🔧 Executing tool: ${name}`);
+  console.log(`Executing tool: ${name}`);
   console.log(`   Arguments:`, args);
 
   let result: any;
@@ -206,7 +206,7 @@ Be concise and professional in your responses.`,
   ];
 
   console.log('\n💬 User:', userMessage);
-  console.log('\n🤖 Processing...\n');
+  console.log('\nProcessing...\n');
 
   let iterations = 0;
   const MAX_ITERATIONS = 5;

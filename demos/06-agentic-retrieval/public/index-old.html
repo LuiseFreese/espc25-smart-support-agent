@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Retrieval Demo - ESPC25</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Agentic Retrieval Demo</h1>
+            <p>Query Planning → Parallel Search → Citation-based Merging</p>
+        </header>
+
+        <div class="card">
+            <form class="search-form" id="searchForm">
+                <input
+                    type="text"
+                    id="questionInput"
+                    placeholder="Ask a complex question that requires multiple sources..."
+                    required
+                />
+                <button type="submit" id="searchBtn">Search</button>
+            </form>
+
+            <div class="example-questions">
+                <button class="example-btn" data-question="How do I fix VPN disconnection issues and what MTU settings should I use?">
+                    ⚙️ VPN + MTU
+                </button>
+                <button class="example-btn" data-question="What are the steps to reset a password and recover a locked account?">
+                    🔐 Password + Account
+                </button>
+                <button class="example-btn" data-question="How do I handle duplicate charges and understand my invoice?">
+                    💳 Billing Issues
+                </button>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <!-- Query Planning Section -->
+            <div class="card section" id="querySection" style="display: none;">
+                <h2 class="section-title">
+                    Query Planning
+                </h2>
+                <div id="loadingQueries" class="loading">
+                    <div class="spinner"></div>
+                    <span>Decomposing question into sub-queries...</span>
+                </div>
+                <div class="sub-queries" id="subQueries"></div>
+            </div>
+
+            <!-- Final Answer Section -->
+            <div class="card section" id="answerSection" style="display: none;">
+                <h2 class="section-title">
+                    <span class="emoji">✨</span>
+                    Final Answer
+                </h2>
+                <div id="loadingAnswer" class="loading">
+                    <div class="spinner"></div>
+                    <span>Merging results and generating answer...</span>
+                </div>
+                <div class="final-answer" id="finalAnswer"></div>
+            </div>
+
+            <!-- Passages Section -->
+            <div class="card section" id="passagesSection" style="display: none;">
+                <h2 class="section-title">
+                    Retrieved Passages
+                </h2>
+                <div id="loadingPassages" class="loading">
+                    <div class="spinner"></div>
+                    <span>Searching knowledge base...</span>
+                </div>
+                <div class="passages" id="passages"></div>
+            </div>
+
+            <!-- Error Section -->
+            <div class="card section" id="errorSection" style="display: none;">
+                <div class="error" id="errorMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

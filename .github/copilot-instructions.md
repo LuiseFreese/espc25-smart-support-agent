@@ -4,13 +4,17 @@
 
 An **event-driven IT support automation system** that processes support emails, classifies them, searches a knowledge base, and automatically responds or escalates based on confidence scores.
 
-### Five Progressive Demos
+### Six Progressive Demos
 
 1. **Demo 01: Triage** - Keyword-based classification (Network/Access/Billing/Software)
 2. **Demo 02: RAG Search** - Knowledge base retrieval with confidence scoring
+   - **Streaming Mode**: Optional real-time token-by-token response streaming via toggle
+   - **Multi-Modal**: Optional image upload for visual analysis (GPT-4o-mini vision capabilities)
 3. **Demo 03: Agent Tools** - Function calling patterns for extensibility
 4. **Demo 04: Production** - Complete email automation (MAIN SYSTEM)
 5. **Demo 05: Copilot Plugin** - Triage + RAG endpoints for Copilot Studio (deployed to func-agents)
+6. **Demo 06: Agentic Retrieval** - Query planning, parallel search fanout, result merging with citations
+7. **Demo 07: Multi-Agent Orchestration** - Local orchestrator with Triage/FAQ/RAG/Ticket agents
 
 **Tech Stack:** Azure AI Foundry • Azure OpenAI (GPT-4o-mini) • Azure AI Search • Azure Functions (Node.js 20 + Python 3.11) • Table Storage • Application Insights
 
@@ -116,7 +120,7 @@ The system decides whether to auto-reply or escalate based on **search quality s
 ```
 demos/
 ├── 01-triage-promptflow/      # Keyword classification
-├── 02-rag-search/              # Knowledge base + RAG search
+├── 02-rag-search/              # Knowledge base + RAG search (with streaming toggle)
 │   ├── content/                # 11 KB markdown docs
 │   ├── ingest/                 # TypeScript ingestion (Azure SDK)
 │   └── rag-function/           # Python HTTP endpoint (deployed)
@@ -126,7 +130,23 @@ demos/
 │       ├── functions/          # Azure Functions endpoints
 │       ├── services/           # Business logic (AIService, TableStorageService, etc.)
 │       └── models/             # TypeScript types
-└── 05-triage-plugin/           # Copilot Studio integration
+├── 05-triage-plugin/           # Copilot Studio integration
+├── 06-agentic-retrieval/       # Unified demo UI + Query planning + parallel search
+│   └── src/
+│       ├── App.tsx             # React UI with 5 demo tabs
+│       ├── server-unified.ts   # Express backend serving all demo endpoints
+│       ├── agenticRetrieval.ts # Main CLI entrypoint
+│       ├── queryPlanning.ts    # LLM-based query decomposition
+│       ├── searchFanout.ts     # Parallel Azure AI Search queries
+│       └── mergeResults.ts     # Citation-based answer merging
+└── 07-multi-agent-orchestration/ # Local multi-agent system
+    └── src/
+        ├── index.ts            # Orchestrator
+        └── agents/
+            ├── triageAgent.ts  # Intent classification
+            ├── faqAgent.ts     # Hard-coded FAQ matching
+            ├── ragAgent.ts     # Single-query RAG
+            └── ticketAgent.ts  # Ticket creation
 
 infra/
 ├── main.bicep              # Main infrastructure template

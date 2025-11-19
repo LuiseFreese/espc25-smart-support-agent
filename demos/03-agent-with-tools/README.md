@@ -312,7 +312,40 @@ Invoke-RestMethod -Uri "http://localhost:7071/api/CreateTicket" `
 
 ---
 
-## How to Use This Demo (For Learning/Testing)
+## How to Use This Demo
+
+### Option 1: Interactive UI (Recommended for Demos)
+
+**Quick Start:**
+
+1. **Start all servers** (Azure Functions + Backend + Frontend):
+   ```powershell
+   # From workspace root
+   # Press Ctrl+Shift+P → "Tasks: Run Task" → "Start All Demo Servers"
+   ```
+
+2. **Open browser** to `http://localhost:5173`
+
+3. **Navigate to "Demo 03: Agent Tools" tab**
+
+4. **Try example queries:**
+   - "Where is order 12345?"
+   - "What is the status of order ABC789?"
+   - Click example buttons for pre-filled queries
+
+**What You'll See:**
+- **Tools Executed**: Shows which function was called, arguments, and results
+- **Agent Response**: Natural language answer synthesized from tool results
+- **Conversation Flow**: Complete interaction history
+
+**Requirements:**
+- Vite frontend running on port 5173
+- Express backend running on port 3000
+- Azure Functions running on port 7071 (see Step 1 below)
+
+### Option 2: Command Line (For Testing/Development)
+
+For learning how the agent works under the hood or automated testing.
 
 ### Step 1: Start Azure Functions Locally
 
@@ -376,11 +409,11 @@ npm run dev -- "Check order 67890 and if it's not delivered, create a ticket"
 #### Expected Output
 
 ```
-💬 User: Where is order 12345?
+User: Where is order 12345?
 
-🤖 Processing...
+Processing...
 
-🔧 Executing tool: getOrderStatus
+Executing tool: getOrderStatus
    Arguments: { orderId: '12345' }
    Result: {
   orderId: '12345',

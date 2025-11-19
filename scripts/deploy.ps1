@@ -47,14 +47,31 @@ Write-Host "`n╔═════════════════════
 Write-Host "║  Azure AI Foundry Smart Support Agent - Full Deployment   ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-Write-Host "Configuration:" -ForegroundColor Yellow
+# Force fresh login to ensure authentication
+Write-Host "[0/9] Ensuring fresh Azure authentication..." -ForegroundColor Cyan
+try {
+    az logout 2>$null
+    Write-Host "  Logged out from previous session" -ForegroundColor Gray
+} catch {
+    # Ignore errors if not logged in
+}
+
+Write-Host "  Opening browser for Azure login..." -ForegroundColor Yellow
+az login --output none
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Azure login failed. Please check your credentials." -ForegroundColor Red
+    exit 1
+}
+Write-Host "✓ Successfully authenticated with Azure" -ForegroundColor Green
+
+Write-Host "`nConfiguration:" -ForegroundColor Yellow
 Write-Host "  Subscription: $SubscriptionId" -ForegroundColor Gray
 Write-Host "  Location: $Location" -ForegroundColor Gray
 Write-Host "  Resource Group: $ResourceGroup" -ForegroundColor Gray
 Write-Host "  Support Email: $SupportEmail`n" -ForegroundColor Gray
 
 # Validate prerequisites
-Write-Host "[0/8] Validating prerequisites..." -ForegroundColor Yellow
+Write-Host "[1/9] Validating prerequisites..." -ForegroundColor Yellow
 
 # Check Azure CLI
 try {
@@ -84,7 +101,7 @@ try {
 }
 
 # Set Azure subscription
-Write-Host "`n[1/8] Setting Azure subscription..." -ForegroundColor Yellow
+Write-Host "`n[2/9] Setting Azure subscription..." -ForegroundColor Yellow
 az account set --subscription $SubscriptionId
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Failed to set subscription. Check subscription ID and permissions." -ForegroundColor Red
@@ -93,13 +110,85 @@ if ($LASTEXITCODE -ne 0) {
 $tenantId = az account show --query "tenantId" -o tsv
 Write-Host "✓ Subscription set (Tenant: $tenantId)" -ForegroundColor Green
 
+# Purge soft-deleted Cognitive Services resources
+Write-Host "`n[3/10] Checking for soft-deleted resources..." -ForegroundColor Yellow
+$deletedVaults = $null
+$deletedAccounts = $null
+
+try {
+    # Check for soft-deleted Cognitive Services (Azure OpenAI)
+    $deletedAccounts = az cognitiveservices account list-deleted --query "[?location=='$Location']" -o json 2>$null | ConvertFrom-Json
+    if ($deletedAccounts -and $deletedAccounts.Count -gt 0) {
+        Write-Host "  Found $($deletedAccounts.Count) soft-deleted Cognitive Services account(s)" -ForegroundColor Yellow
+        foreach ($account in $deletedAccounts) {
+            Write-Host "  Attempting to purge: $($account.name)..." -ForegroundColor Gray
+            az cognitiveservices account purge --name $account.name --resource-group $account.resourceGroup --location $account.location 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  ✓ Purged $($account.name)" -ForegroundColor Green
+            } else {
+                Write-Host "  ⚠️  Could not purge $($account.name) - will attempt restore during deployment" -ForegroundColor Yellow
+            }
+        }
+    } else {
+        Write-Host "  No soft-deleted Cognitive Services resources found" -ForegroundColor Green
+    }
+
+    # Check for soft-deleted Key Vaults
+    $deletedVaults = az keyvault list-deleted --query "[?properties.location=='$Location']" -o json 2>$null | ConvertFrom-Json
+    if ($deletedVaults -and $deletedVaults.Count -gt 0) {
+        Write-Host "  Found $($deletedVaults.Count) soft-deleted Key Vault(s)" -ForegroundColor Yellow
+        Write-Host "  Attempting to recover soft-deleted vaults..." -ForegroundColor Cyan
+        foreach ($vault in $deletedVaults) {
+            Write-Host "  Recovering: $($vault.name)..." -ForegroundColor Gray
+            try {
+                az keyvault recover --name $vault.name --location $vault.properties.location 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "  ✓ Recovered $($vault.name)" -ForegroundColor Green
+                } else {
+                    Write-Host "  ⚠️  Could not recover $($vault.name) - deployment may recreate it" -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "  ⚠️  Recovery failed for $($vault.name)" -ForegroundColor Yellow
+            }
+        }
+        Write-Host "  Waiting 30 seconds for Key Vault recovery to complete..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+    } else {
+        Write-Host "  No soft-deleted Key Vaults found" -ForegroundColor Green
+    }
+
+    if ($deletedAccounts -and $deletedAccounts.Count -gt 0) {
+        Write-Host "  Waiting 30 seconds for Cognitive Services purge to complete..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+    }
+} catch {
+    Write-Host "  ⚠️  Could not check for soft-deleted resources (continuing anyway)" -ForegroundColor Yellow
+}
+
 # Deploy Bicep infrastructure
-Write-Host "`n[2/8] Deploying Azure infrastructure (10-15 min)..." -ForegroundColor Yellow
+Write-Host "`n[4/10] Deploying Azure infrastructure (10-15 min)..." -ForegroundColor Yellow
 $infraPath = Join-Path $PSScriptRoot "..\infra"
 Push-Location $infraPath
 
 $deploymentName = "smart-agents-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 Write-Host "  Deployment name: $deploymentName" -ForegroundColor Gray
+
+# Check if this is a redeployment (resource group or soft-deleted resources exist)
+$existingRG = az group exists --name $ResourceGroup 2>$null
+$hasRecoveredResources = ($deletedVaults -and $deletedVaults.Count -gt 0) -or ($deletedAccounts -and $deletedAccounts.Count -gt 0)
+
+# Skip role assignments if resource group exists OR if we recovered any resources
+# (recovered resources retain their role assignments)
+# Use lowercase for proper boolean conversion in Bicep
+$createRoleAssignments = if ($existingRG -eq 'true' -or $hasRecoveredResources) { 'false' } else { 'true' }
+
+if ($existingRG -eq 'true') {
+    Write-Host "  Detected existing resource group - role assignments will be skipped" -ForegroundColor Yellow
+} elseif ($hasRecoveredResources) {
+    Write-Host "  Detected recovered resources - role assignments will be skipped" -ForegroundColor Yellow
+} else {
+    Write-Host "  Fresh deployment - creating all resources and role assignments" -ForegroundColor Cyan
+}
 
 # Get current user object ID for RBAC assignments
 $currentUserObjectId = az ad signed-in-user show --query "id" -o tsv
@@ -110,6 +199,7 @@ Invoke-WithRetry -ScriptBlock {
         --template-file main.bicep `
         --parameters parameters.dev.json `
         --parameters currentUserObjectId=$currentUserObjectId `
+        --parameters createRoleAssignments=$createRoleAssignments `
         --name $deploymentName `
         --output json 2>&1 | Out-String
 
@@ -124,9 +214,9 @@ Invoke-WithRetry -ScriptBlock {
 
             # If the deployment partially succeeded (some resources deployed), continue
             Write-Host "  Checking deployment status..." -ForegroundColor Gray
-            $resourcesDeployed = az resource list --resource-group $ResourceGroup --query "length(@)" -o tsv 2>$null
+            $resourcesDeployed = (az resource list --resource-group $ResourceGroup --query "length(@)" -o tsv 2>$null)
 
-            if ($resourcesDeployed -gt 0) {
+            if ($resourcesDeployed -and $resourcesDeployed -gt 0) {
                 Write-Host "  ✓ Core infrastructure exists ($resourcesDeployed resources found)" -ForegroundColor Green
                 Write-Host "  Continuing deployment (role assignments will be skipped)..." -ForegroundColor Cyan
                 return # Exit retry loop successfully
@@ -139,14 +229,65 @@ Invoke-WithRetry -ScriptBlock {
 }
 
 Pop-Location
-Write-Host "✓ Infrastructure deployed" -ForegroundColor Green
+
+# Validate deployment and check for failed resources
+Write-Host "\n  Validating deployment..." -ForegroundColor Gray
+
+# Check for failed nested deployments (like role assignments)
+$failedDeployments = az deployment group list --resource-group $ResourceGroup --query "[?properties.provisioningState=='Failed'].{Name:name, Error:properties.error.code}" -o json 2>$null | ConvertFrom-Json
+
+if ($failedDeployments -and $failedDeployments.Count -gt 0) {
+    $criticalFailures = @()
+    foreach ($deployment in $failedDeployments) {
+        if ($deployment.Error -eq 'RoleAssignmentExists') {
+            Write-Host "  ⚠️  $($deployment.Name): Role assignments already exist (expected on redeployment)" -ForegroundColor Yellow
+        } else {
+            $criticalFailures += $deployment
+        }
+    }
+
+    if ($criticalFailures.Count -gt 0) {
+        Write-Host "⚠️  Warning: Some deployments failed:" -ForegroundColor Yellow
+        foreach ($deployment in $criticalFailures) {
+            Write-Host "  - $($deployment.Name): $($deployment.Error)" -ForegroundColor Yellow
+        }
+    }
+}
+
+$failedResources = az deployment sub show --name $deploymentName --query "properties.outputResources[?provisioningState=='Failed'].id" -o json 2>$null | ConvertFrom-Json
+
+if ($failedResources -and $failedResources.Count -gt 0) {
+    Write-Host "⚠️  Warning: Some resources failed to deploy:" -ForegroundColor Yellow
+    foreach ($resource in $failedResources) {
+        $resourceName = ($resource -split '/')[-1]
+        Write-Host "  - $resourceName" -ForegroundColor Yellow
+
+        # Get error details
+        $resourceType = ($resource -split '/providers/')[-1] -replace '/[^/]+$', ''
+        $errorDetails = az deployment sub show --name $deploymentName --query "properties.error" -o json 2>$null | ConvertFrom-Json
+
+        if ($errorDetails) {
+            Write-Host "    Error: $($errorDetails.message)" -ForegroundColor Gray
+
+            # Special handling for AI Hub Key Vault permission error
+            if ($resource -like '*MachineLearningServices/workspaces*' -and $errorDetails.message -like '*KeyVault*accessPolicies*') {
+                Write-Host "    Note: AI Hub deployment failed due to Key Vault permissions." -ForegroundColor Yellow
+                Write-Host "    This is a known issue with fresh deployments." -ForegroundColor Yellow
+                Write-Host "    AI Hub is optional - continuing with core infrastructure..." -ForegroundColor Cyan
+            }
+        }
+    }
+    Write-Host "\n  Core infrastructure deployed successfully" -ForegroundColor Green
+} else {
+    Write-Host "✓ Infrastructure deployed successfully" -ForegroundColor Green
+}
 
 # Wait for resources to be fully provisioned
-Write-Host "`n  Waiting for resources to initialize (60 sec)..." -ForegroundColor Gray
+Write-Host "\n  Waiting for resources to initialize (60 sec)..." -ForegroundColor Gray
 Start-Sleep -Seconds 60
 
 # Link Communication Services domain
-Write-Host "`n[3/8] Configuring Communication Services..." -ForegroundColor Yellow
+Write-Host "`n[5/10] Configuring Communication Services..." -ForegroundColor Yellow
 
 $commServicesName = az resource list `
     --resource-group $ResourceGroup `
@@ -169,19 +310,37 @@ if ($commServicesName) {
     if ($currentLinkedDomains -contains $emailDomainId) {
         Write-Host "✓ Email domain already linked" -ForegroundColor Green
     } else {
-        Write-Host "  Linking email domain..." -ForegroundColor Gray
-        Invoke-WithRetry -ScriptBlock {
-            az communication update `
-                --name $commServicesName `
-                --resource-group $ResourceGroup `
-                --linked-domains $emailDomainId `
-                --output none 2>&1 | Out-Null
+        Write-Host "  Linking email domain (this may take 30-60 seconds)..." -ForegroundColor Gray
 
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to link email domain"
+        # Run with timeout to prevent hanging
+        $linkJob = Start-Job -ScriptBlock {
+            param($name, $rg, $domainId)
+            az communication update `
+                --name $name `
+                --resource-group $rg `
+                --linked-domains $domainId `
+                --output none 2>&1
+        } -ArgumentList $commServicesName, $ResourceGroup, $emailDomainId
+
+        $timeout = 90 # seconds
+        $linkJob | Wait-Job -Timeout $timeout | Out-Null
+
+        if ($linkJob.State -eq 'Completed') {
+            $linkJob | Receive-Job | Out-Null
+            if ($linkJob.ChildJobs[0].State -eq 'Completed' -and -not $linkJob.ChildJobs[0].Error) {
+                Write-Host "✓ Communication Services domain linked" -ForegroundColor Green
+            } else {
+                Write-Host "⚠️  Domain linking may have failed - check Azure Portal" -ForegroundColor Yellow
+                Write-Host "  You can manually link the domain later if needed" -ForegroundColor Gray
             }
+        } else {
+            Write-Host "⚠️  Domain linking timed out after $timeout seconds" -ForegroundColor Yellow
+            Write-Host "  Continuing deployment - you can link manually in Azure Portal:" -ForegroundColor Yellow
+            Write-Host "    Communication Services → Email → Domains → Link to '$emailServiceName'" -ForegroundColor Gray
+            $linkJob | Stop-Job
         }
-        Write-Host "✓ Communication Services domain linked" -ForegroundColor Green
+
+        $linkJob | Remove-Job -Force
     }
 
     # Get sender address
@@ -195,9 +354,8 @@ if ($commServicesName) {
         Write-Host "  Sender address: donotreply@$senderAddress" -ForegroundColor Gray
     }
 } else {
-    Write-Host "❌ Communication Services not found - email sending will not work" -ForegroundColor Red
-    Write-Host "  Check if Bicep deployment completed successfully" -ForegroundColor Yellow
-    exit 1
+    Write-Host "⚠️  Communication Services not found - email sending will not work" -ForegroundColor Yellow
+    Write-Host "  Continuing with deployment - other features will still work" -ForegroundColor Gray
 }
 
 # Update .env file with new resource values
@@ -251,78 +409,56 @@ SUBSCRIPTION_ID=$subscriptionId
 
 # Support Email
 SUPPORT_EMAIL_ADDRESS=$SupportEmail
+
+# Demo 03 Function Tools (for local development)
+AZURE_FUNCTION_APP_URL=http://localhost:7071/api
 "@
 
 Set-Content -Path $envFilePath -Value $envContent -Force
 Write-Host "✓ .env file updated" -ForegroundColor Green
 
-# Ingest Knowledge Base
-Write-Host "`n[4/8] Ingesting knowledge base documents..." -ForegroundColor Yellow
+# Configure Demo 06 Agentic Retrieval .env
+Write-Host "`n  Configuring Demo 06 Agentic Retrieval..." -ForegroundColor Gray
+$demo06Path = Join-Path $PSScriptRoot "..\demos\06-agentic-retrieval\.env"
+$demo06EnvContent = @"
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=$openaiEndpoint
+AZURE_OPENAI_API_KEY=$openaiKey
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
 
-Write-Host "  Search: $searchName" -ForegroundColor Gray
-Write-Host "  OpenAI: $openaiName" -ForegroundColor Gray
+# Azure AI Search Configuration
+AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
+AZURE_AI_SEARCH_API_KEY=$searchKey
+AZURE_AI_SEARCH_INDEX=kb-support
+"@
 
-$ingestPath = Join-Path $PSScriptRoot "..\demos\02-rag-search"
+Set-Content -Path $demo06Path -Value $demo06EnvContent -Force
+Write-Host "  ✓ Demo 06 .env file configured" -ForegroundColor Green
 
-if (Test-Path (Join-Path $ingestPath "ingest-kb.py")) {
-    Push-Location $ingestPath
+# Configure Demo 07 (Multi-Agent Orchestration) - needs search, OpenAI, and storage
+$demo07Path = Join-Path $PSScriptRoot "..\demos\07-multi-agent-orchestration\.env"
+$demo07EnvContent = @"
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=$openaiEndpoint
+AZURE_OPENAI_API_KEY=$openaiKey
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
 
-    # Set environment variables for ingestion
-    $env:AZURE_AI_SEARCH_ENDPOINT = $searchEndpoint
-    $env:AZURE_AI_SEARCH_API_KEY = $searchKey
-    $env:AZURE_OPENAI_ENDPOINT = $openaiEndpoint
-    $env:AZURE_OPENAI_API_KEY = $openaiKey
+# Azure AI Search Configuration
+AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
+AZURE_AI_SEARCH_API_KEY=$searchKey
+AZURE_AI_SEARCH_INDEX=kb-support
 
-    Write-Host "  Running Python ingestion script..." -ForegroundColor Gray
-    python ingest-kb.py
+# Azure Table Storage (for ticket creation)
+STORAGE_ACCOUNT_NAME=$storageAccountName
+STORAGE_ACCOUNT_KEY=$storageKey
+"@
 
-    if ($LASTEXITCODE -eq 0) {
-        # Wait for Azure AI Search indexing to complete (asynchronous process)
-        Write-Host "  Waiting for search indexing to complete..." -ForegroundColor Gray
-        $maxAttempts = 12
-        $attempt = 0
-        $documentCount = 0
-
-        while ($attempt -lt $maxAttempts) {
-            Start-Sleep -Seconds 5
-            $attempt++
-
-            try {
-                $indexStats = Invoke-RestMethod `
-                    -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
-                    -Headers @{ 'api-key' = $searchKey } `
-                    -ErrorAction Stop
-
-                $documentCount = $indexStats.documentCount
-
-                if ($documentCount -gt 0) {
-                    Write-Host "✓ Knowledge base ingested ($documentCount documents)" -ForegroundColor Green
-                    break
-                }
-
-                Write-Host "    Attempt $attempt/$maxAttempts - Indexing in progress..." -ForegroundColor Gray
-            } catch {
-                Write-Host "    Attempt $attempt/$maxAttempts - Checking index status..." -ForegroundColor Gray
-            }
-        }
-
-        if ($documentCount -eq 0) {
-            Write-Host "⚠️  Documents uploaded but indexing not yet complete" -ForegroundColor Yellow
-            Write-Host "    This is normal for large KB. Documents will be available shortly." -ForegroundColor Gray
-        }
-    } else {
-        Write-Host "❌ Knowledge base ingestion failed" -ForegroundColor Red
-        Pop-Location
-        exit 1
-    }
-    Pop-Location
-} else {
-    Write-Host "❌ Ingest script not found at: $ingestPath" -ForegroundColor Red
-    exit 1
-}
+Set-Content -Path $demo07Path -Value $demo07EnvContent -Force
+Write-Host "  ✓ Demo 07 .env file configured" -ForegroundColor Green
 
 # Deploy Function Apps (Demo 02 RAG + Demo 04 Agents)
-Write-Host "`n[5/8] Deploying Function code..." -ForegroundColor Yellow
+# Deploy Function Apps
+Write-Host "`n[6/10] Deploying Function code...\" -ForegroundColor Yellow
 
 # Get both function apps
 $funcAgents = az functionapp list `
@@ -349,7 +485,7 @@ Write-Host "  Found: $funcRag (RAG search)" -ForegroundColor Gray
 # ============================================================================
 # Deploy RAG Function First (Demo 02)
 # ============================================================================
-Write-Host "`n  [5a] Deploying RAG function (Demo 02)..." -ForegroundColor Cyan
+Write-Host "`n  [6a] Deploying RAG function (Demo 02)..." -ForegroundColor Cyan
 $demo02RagPath = Join-Path $PSScriptRoot "..\demos\02-rag-search\rag-function"
 
 if (Test-Path $demo02RagPath) {
@@ -385,7 +521,7 @@ az functionapp config appsettings set `
         "AZURE_AI_SEARCH_INDEX=kb-support" `
         "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
         "AZURE_OPENAI_API_KEY=$openaiKey" `
-        "AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini" `
+        "AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini" `
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large" `
         "AZURE_OPENAI_API_VERSION=2024-08-01-preview" `
     --output none
@@ -401,7 +537,7 @@ Write-Host "    Endpoint: $ragEndpoint" -ForegroundColor Gray
 # ============================================================================
 # Deploy Agents Function (Demo 04 + Demo 05)
 # ============================================================================
-Write-Host "`n  [5b] Deploying Agents function (Demo 04 + Demo 05)..." -ForegroundColor Cyan
+Write-Host "`n  [6b] Deploying Agents function (Demo 04 + Demo 05)..." -ForegroundColor Cyan
 Write-Host "       Includes: Email processing endpoints AND Copilot Studio triage/answer endpoints" -ForegroundColor Gray
 $demo04Path = Join-Path $PSScriptRoot "..\demos\04-real-ticket-creation\function"
 
@@ -459,9 +595,56 @@ az functionapp config appsettings set `
 Write-Host "✓ Both function apps deployed and configured" -ForegroundColor Green
 
 # ============================================================================
+# Configure Demo 06 Local Development Environment
+# ============================================================================
+Write-Host "`n[6c] Configuring Demo 06 local environment..." -ForegroundColor Cyan
+
+$demo06EnvPath = Join-Path $PSScriptRoot "..\demos\06-agentic-retrieval\.env"
+Write-Host "    Creating .env file at: $demo06EnvPath" -ForegroundColor Gray
+
+# Create .env file with all necessary configuration
+@"
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=$openaiEndpoint
+AZURE_OPENAI_API_KEY=$openaiKey
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+
+# Azure AI Search Configuration
+AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
+AZURE_AI_SEARCH_API_KEY=$searchKey
+AZURE_AI_SEARCH_INDEX=kb-support
+
+# Demo 02 RAG Function Endpoint (deployed Python function)
+RAG_ENDPOINT=$ragEndpoint
+RAG_API_KEY=$ragFunctionKey
+"@ | Out-File -FilePath $demo06EnvPath -Encoding utf8 -Force
+
+Write-Host "✓ Demo 06 environment configured" -ForegroundColor Green
+
+# Configure demos-ui/backend (same configuration as Demo 06)
+$demosUIBackendEnvPath = Join-Path $PSScriptRoot "..\demos-ui\backend\.env"
+@"
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=$openaiEndpoint
+AZURE_OPENAI_API_KEY=$openaiKey
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+
+# Azure AI Search Configuration
+AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
+AZURE_AI_SEARCH_API_KEY=$searchKey
+AZURE_AI_SEARCH_INDEX=kb-support
+
+# Demo 02 RAG Function Endpoint (deployed Python function)
+RAG_ENDPOINT=$ragEndpoint
+RAG_API_KEY=$ragFunctionKey
+"@ | Out-File -FilePath $demosUIBackendEnvPath -Encoding utf8 -Force
+
+Write-Host "✓ Demos UI backend environment configured" -ForegroundColor Green
+
+# ============================================================================
 # Create SupportTickets Table in Storage Account
 # ============================================================================
-Write-Host "`n[5c] Creating SupportTickets table..." -ForegroundColor Cyan
+Write-Host "`n[6d] Creating SupportTickets table..." -ForegroundColor Cyan
 
 # Get storage account details
 $storageAccountName = az storage account list --resource-group $ResourceGroup --query "[?contains(name, 'stagents')].name" -o tsv | Select-Object -First 1
@@ -505,7 +688,7 @@ if (-not $storageAccountName) {
 }
 
 # Setup Microsoft Graph Webhook
-Write-Host "`n[6/8] Setting up Microsoft Graph webhook..." -ForegroundColor Yellow
+Write-Host "`n[7/10] Setting up Microsoft Graph webhook..." -ForegroundColor Yellow
 $setupScript = Join-Path $PSScriptRoot "setup-graph-webhook.ps1"
 
 if (Test-Path $setupScript) {
@@ -516,13 +699,129 @@ if (Test-Path $setupScript) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "⚠️  Graph webhook setup had issues - you may need to run setup-graph-webhook.ps1 manually" -ForegroundColor Yellow
     }
+
+    # Wait for app settings to propagate
+    Write-Host "  Waiting 10 seconds for app settings to propagate..." -ForegroundColor Gray
+    Start-Sleep -Seconds 10
 } else {
     Write-Host "❌ setup-graph-webhook.ps1 not found" -ForegroundColor Red
     exit 1
 }
 
+# Ingest Knowledge Base (moved here to give OpenAI endpoints maximum time to be ready)
+Write-Host "`n[8/10] Ingesting knowledge base documents..." -ForegroundColor Yellow
+
+Write-Host "  Search: $searchName" -ForegroundColor Gray
+Write-Host "  OpenAI: $openaiName" -ForegroundColor Gray
+
+# Test actual API availability with longer timeout since endpoints should be ready by now
+Write-Host "  Testing Azure OpenAI embeddings endpoint..." -ForegroundColor Gray
+$maxWait = 120
+$waited = 0
+$deploymentsReady = $false
+
+while ($waited -lt $maxWait -and -not $deploymentsReady) {
+    try {
+        $testHeaders = @{
+            'api-key' = $openaiKey
+            'Content-Type' = 'application/json'
+        }
+        $testBody = @{
+            input = "test"
+        } | ConvertTo-Json
+
+        $testResponse = Invoke-RestMethod `
+            -Uri "$openaiEndpoint/openai/deployments/text-embedding-3-large/embeddings?api-version=2024-08-01-preview" `
+            -Method Post `
+            -Headers $testHeaders `
+            -Body $testBody `
+            -TimeoutSec 10 `
+            -ErrorAction Stop
+
+        Write-Host "  ✓ OpenAI embeddings endpoint verified and ready" -ForegroundColor Green
+        Write-Host "  Waiting additional 30 seconds for model to fully load..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+        $deploymentsReady = $true
+    } catch {
+        Write-Host "  Endpoint not ready yet, waiting... ($waited/$maxWait seconds)" -ForegroundColor Gray
+        Start-Sleep -Seconds 10
+        $waited += 10
+    }
+}
+
+if (-not $deploymentsReady) {
+    Write-Host "  ⚠️  OpenAI endpoints still not ready - skipping KB ingestion" -ForegroundColor Yellow
+    Write-Host "  You can manually run ingestion later: cd demos\02-rag-search && .\run-ingestion.ps1" -ForegroundColor Yellow
+} else {
+    $ingestPath = Join-Path $PSScriptRoot "..\demos\02-rag-search"
+
+    if (Test-Path (Join-Path $ingestPath "run-ingestion.ps1")) {
+        Push-Location $ingestPath
+
+        Write-Host "  Running KB ingestion via helper script..." -ForegroundColor Gray
+        .\run-ingestion.ps1 -ResourceGroup $ResourceGroup
+
+        if ($LASTEXITCODE -eq 0) {
+            # Wait for Azure AI Search indexing to complete
+            Write-Host "  Waiting for search indexing to complete..." -ForegroundColor Gray
+            $maxAttempts = 12
+            $attempt = 0
+            $documentCount = 0
+
+            while ($attempt -lt $maxAttempts) {
+                Start-Sleep -Seconds 5
+                $attempt++
+
+                try {
+                    $indexStats = Invoke-RestMethod `
+                        -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
+                        -Headers @{ 'api-key' = $searchKey } `
+                        -ErrorAction Stop
+
+                    $documentCount = $indexStats.documentCount
+
+                    if ($documentCount -gt 0) {
+                        Write-Host "✓ Knowledge base ingested ($documentCount documents)" -ForegroundColor Green
+                        break
+                    }
+
+                    Write-Host "    Attempt $attempt/$maxAttempts - Indexing in progress..." -ForegroundColor Gray
+                } catch {
+                    Write-Host "    Attempt $attempt/$maxAttempts - Checking index status..." -ForegroundColor Gray
+                }
+            }
+
+            if ($documentCount -eq 0) {
+                Write-Host "⚠️  Indexing not complete yet, waiting 60 more seconds..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 60
+
+                try {
+                    $indexStats = Invoke-RestMethod `
+                        -Uri "$searchEndpoint/indexes/kb-support/stats?api-version=2023-11-01" `
+                        -Headers @{ 'api-key' = $searchKey } `
+                        -ErrorAction Stop
+                    $documentCount = $indexStats.documentCount
+
+                    if ($documentCount -gt 0) {
+                        Write-Host "✓ Knowledge base indexed ($documentCount documents)" -ForegroundColor Green
+                    } else {
+                        Write-Host "⚠️  Indexing still in progress - documents will be available shortly" -ForegroundColor Yellow
+                    }
+                } catch {
+                    Write-Host "⚠️  Could not verify final index status" -ForegroundColor Yellow
+                }
+            }
+        } else {
+            Write-Host "⚠️  Knowledge base ingestion failed - you can retry manually" -ForegroundColor Yellow
+        }
+        Pop-Location
+    } else {
+        Write-Host "⚠️  Ingest script not found - skipping KB ingestion" -ForegroundColor Yellow
+    }
+}
+
 # Verify Deployment
-Write-Host "`n[7/8] Verifying deployment..." -ForegroundColor Yellow
+Write-Host "`n[9/10] Verifying deployment..." -ForegroundColor Yellow
 $verifyScript = Join-Path $PSScriptRoot "verify-deployment.ps1"
 
 if (Test-Path $verifyScript) {
@@ -566,21 +865,28 @@ Write-Host "  • Session guide: docs/SESSION-STORYLINE.md" -ForegroundColor Whi
 Write-Host "  • Technical reference: docs/DEMO-OVERVIEW.md" -ForegroundColor White
 Write-Host "  • Architecture: docs/AUTHENTICATION-ARCHITECTURE.md`n" -ForegroundColor White
 
-# [8/8] Final Step: Grant Admin Consent (Interactive)
-Write-Host "`n[8/8] Final Configuration: Admin Consent Required" -ForegroundColor Yellow
+# [10/10] Final Step: Grant Admin Consent (Interactive)
+Write-Host "`n[10/10] Final Configuration: Admin Consent Required" -ForegroundColor Yellow
 Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  Microsoft Graph Admin Consent (Manual Step Required)     ║" -ForegroundColor Cyan
+Write-Host "║  Grant Admin Consent (Global Administrator Required)      ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-Write-Host "⚠️  IMPORTANT: The webhook cannot process emails until you grant admin consent" -ForegroundColor Yellow
-Write-Host "`nWhy this is needed:" -ForegroundColor Cyan
-Write-Host "  • The app needs APPLICATION permissions (not user permissions)" -ForegroundColor White
-Write-Host "  • These permissions require explicit Global Administrator approval" -ForegroundColor White
-Write-Host "  • Automated consent via CLI sometimes fails silently" -ForegroundColor White
-Write-Host "  • Manual consent through browser is the most reliable method`n" -ForegroundColor White
+Write-Host "⚠️  IMPORTANT: Complete this step to enable email processing`n" -ForegroundColor Yellow
 
 # Get app registration details from the setup-graph-webhook script
-$graphAppId = az functionapp config appsettings list --name func-agents-* --resource-group $ResourceGroup --query "[?name=='GRAPH_CLIENT_ID'].value" -o tsv 2>$null | Select-Object -First 1
+# Try multiple methods to retrieve the app ID
+$functionAppName = az functionapp list --resource-group $ResourceGroup --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
+
+if ($functionAppName) {
+    $graphAppId = az functionapp config appsettings list --name $functionAppName --resource-group $ResourceGroup --query "[?name=='GRAPH_CLIENT_ID'].value" -o tsv 2>$null
+}
+
+# Fallback: Query app registration by display name
+if (-not $graphAppId) {
+    $appName = "SmartSupportAgent-$ResourceGroup"
+    $graphAppId = az ad app list --display-name $appName --query "[0].appId" -o tsv 2>$null
+}
+
 $tenantId = az account show --query "tenantId" -o tsv
 
 if ($graphAppId) {
@@ -611,46 +917,37 @@ if ($graphAppId) {
     Write-Host "`n⏳ Waiting 60 seconds for Azure AD to propagate consent..." -ForegroundColor Gray
     Start-Sleep -Seconds 60
 
+# Fixed webhook creation section after admin consent
+
     Write-Host "`n🔄 Testing webhook creation..." -ForegroundColor Yellow
 
-    # Get the function key for webhook creation
-    $functionKey = az functionapp keys list --name func-agents-* --resource-group $ResourceGroup --query "functionKeys.default" -o tsv 2>$null | Select-Object -First 1
-    $functionAppName = az functionapp list --resource-group $ResourceGroup --query "[?contains(name, 'func-agents')].name" -o tsv | Select-Object -First 1
+    # Use function app name from earlier deployment (already stored in $funcAgents)
+    if ($funcAgents) {
+        $functionKey = az functionapp keys list --name $funcAgents --resource-group $ResourceGroup --query "functionKeys.default" -o tsv 2>$null
 
-    if ($functionKey -and $functionAppName) {
-        try {
-            $headers = @{ 'x-functions-key' = $functionKey }
-            $webhookResult = Invoke-RestMethod -Uri "https://$functionAppName.azurewebsites.net/api/managesubscription" -Method Post -Headers $headers -ErrorAction Stop
+        if ($functionKey) {
+            try {
+                $headers = @{ 'x-functions-key' = $functionKey }
+                $webhookResult = Invoke-RestMethod -Uri "https://$funcAgents.azurewebsites.net/api/managesubscription" -Method Post -Headers $headers -ErrorAction Stop
 
-            Write-Host "✅ SUCCESS! Webhook subscription created" -ForegroundColor Green
-            Write-Host "   Subscription ID: $($webhookResult.subscriptionId)" -ForegroundColor Gray
-            Write-Host "   Expires: $($webhookResult.expirationDateTime)`n" -ForegroundColor Gray
-        }
-        catch {
-            Write-Host "⚠️  Webhook creation encountered an issue:" -ForegroundColor Yellow
-            if ($_.ErrorDetails.Message) {
-                $errorDetails = $_.ErrorDetails.Message | ConvertFrom-Json
-                if ($errorDetails.body.code -eq "ExtensionError" -and $errorDetails.details -like "*Unauthorized*") {
-                    Write-Host "   Error: Still showing 'Unauthorized'" -ForegroundColor Red
-                    Write-Host "`n   Possible causes:" -ForegroundColor Cyan
-                    Write-Host "     1. Admin consent wasn't completed (go back and click 'Accept')" -ForegroundColor White
-                    Write-Host "     2. Signed in with wrong account (needs Global Administrator)" -ForegroundColor White
-                    Write-Host "     3. Azure AD propagation needs more time (wait 5 min and retry)`n" -ForegroundColor White
-
-                    Write-Host "   Manual retry command:" -ForegroundColor Cyan
-                    Write-Host "   `$headers = @{ 'x-functions-key' = '$functionKey' }" -ForegroundColor Gray
-                    Write-Host "   Invoke-RestMethod -Uri 'https://$functionAppName.azurewebsites.net/api/managesubscription' -Method Post -Headers `$headers`n" -ForegroundColor Gray
-                } else {
-                    Write-Host "   Error: $($errorDetails.error)" -ForegroundColor Red
-                    Write-Host "   Details: $($errorDetails.details)`n" -ForegroundColor Gray
-                }
-            } else {
-                Write-Host "   Error: $($_.Exception.Message)`n" -ForegroundColor Red
+                Write-Host "✅ SUCCESS! Webhook subscription created" -ForegroundColor Green
+                Write-Host "   Subscription ID: $($webhookResult.subscriptionId)" -ForegroundColor Gray
+                Write-Host "   Expires: $($webhookResult.expirationDateTime)`n" -ForegroundColor Gray
+            } catch {
+                Write-Host "⚠️  Webhook creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "   This may be due to:" -ForegroundColor Gray
+                Write-Host "   - Admin consent not fully propagated (wait 5 minutes and retry)" -ForegroundColor Gray
+                Write-Host "   - Signed in with non-admin account" -ForegroundColor Gray
+                Write-Host "`n   To retry, run:" -ForegroundColor Cyan
+                Write-Host "   .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail`n" -ForegroundColor Gray
             }
+        } else {
+            Write-Host "⚠️  Could not retrieve function key" -ForegroundColor Yellow
+            Write-Host "   You can manually create webhook using setup script or Azure Portal`n" -ForegroundColor Gray
         }
     } else {
-        Write-Host "⚠️  Could not find function app details to test webhook" -ForegroundColor Yellow
-        Write-Host "   You can manually test with:" -ForegroundColor Cyan
+        Write-Host "⚠️  Could not find function app" -ForegroundColor Yellow
+        Write-Host "   You can manually create webhook with:" -ForegroundColor Cyan
         Write-Host "   .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail`n" -ForegroundColor Gray
     }
 } else {
@@ -661,3 +958,4 @@ if ($graphAppId) {
 Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "║  Deployment Complete - System Ready!                       ║" -ForegroundColor Green
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Green
+

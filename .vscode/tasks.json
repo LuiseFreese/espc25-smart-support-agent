@@ -45,6 +45,126 @@
       "group": "test"
     },
     {
+      "label": "Start Unified UI - Frontend",
+      "type": "shell",
+      "command": "npm run dev",
+      "problemMatcher": [],
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/demos-ui/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "unified-demo"
+      }
+    },
+    {
+      "label": "Start Unified UI - Backend",
+      "type": "shell",
+      "command": "npm run dev",
+      "problemMatcher": [],
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/demos-ui/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "unified-demo"
+      }
+    },
+    {
+      "label": "Start Unified Demo UI",
+      "dependsOn": [
+        "Start Unified UI - Frontend",
+        "Start Unified UI - Backend"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Start Complete Demo System",
+      "dependsOn": [
+        "Start Unified UI - Frontend",
+        "Start Unified UI - Backend",
+        "Start Demo 03 - Function Tools"
+      ],
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    // DEPRECATED: Old tasks - use "Start Unified Demo UI" instead
+    // {
+    //   "label": "Start Demo 06/07 - Frontend (Vite)",
+    //   "type": "shell",
+    //   "command": "npx vite",
+    //   "problemMatcher": [],
+    //   "isBackground": true,
+    //   "options": {
+    //     "cwd": "${workspaceFolder}/demos/06-agentic-retrieval"
+    //   },
+    //   "presentation": {
+    //     "reveal": "always",
+    //     "panel": "dedicated",
+    //     "group": "demo-servers"
+    //   }
+    // },
+    // {
+    //   "label": "Start Demo 06/07 - Backend API",
+    //   "type": "shell",
+    //   "command": "npx tsc && node dist/server-unified.js",
+    //   "problemMatcher": [],
+    //   "isBackground": true,
+    //   "options": {
+    //     "cwd": "${workspaceFolder}/demos/06-agentic-retrieval"
+    //   },
+    //   "presentation": {
+    //     "reveal": "always",
+    //     "panel": "dedicated",
+    //     "group": "demo-servers"
+    //   }
+    // },
+    {
+      "label": "Start Demo 03 - Function Tools",
+      "type": "shell",
+      "command": "npm start",
+      "problemMatcher": [],
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/demos/03-agent-with-tools/function-tool"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "demo-servers"
+      }
+    },
+    // DEPRECATED: Old task - launches outdated code from demos/06-agentic-retrieval
+    // {
+    //   "label": "Start All Demo Servers",
+    //   "dependsOn": [
+    //     "Start Demo 06/07 - Frontend (Vite)",
+    //     "Start Demo 06/07 - Backend API",
+    //     "Start Demo 03 - Function Tools"
+    //   ],
+    //   "problemMatcher": [],
+    //   "group": "build",
+    //   "presentation": {
+    //     "reveal": "always",
+    //     "panel": "dedicated"
+    //   },
+    //   "runOptions": {
+    //     "runOn": "folderOpen"
+    //   }
+    // },
+    {
       "type": "func",
       "label": "func: host start",
       "command": "host start",

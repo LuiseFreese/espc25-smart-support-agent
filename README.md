@@ -50,19 +50,20 @@ graph TB
 - **Storage:** Table Storage with EmailMessageId deduplication
 - **Infrastructure:** Bicep templates, Azure Functions (Node.js + Python)
 
-## Progressive Demos
+## Demos
 
-Each demo builds on the previous, culminating in a production-ready system:
+This project includes 5 progressive demonstrations:
 
-| Demo | Focus | Status | Purpose |
-|------|-------|--------|---------|
-| **[01: Triage](demos/01-triage-promptflow/)** | Classification | Reference | Pattern used in Demos 04-05 |
-| **[02: RAG Search](demos/02-rag-search/)** | Knowledge retrieval | **Deployed** | HTTP endpoint called by Demo 04 |
-| **[03: Agent Tools](demos/03-agent-with-tools/)** | Function calling | Reference | Pattern used in Demo 04 |
-| **[04: Production](demos/04-real-ticket-creation/)** | Email automation | **Deployed** | Orchestrates all patterns |
-| **[05: Copilot Plugin](demos/05-triage-plugin/)** | Studio integration | **Deployed** | Triage as Copilot Studio action |
+1. **Demo 01: AI Triage** - Keyword-based classification (Network/Access/Billing/Software)
+2. **Demo 02: Simple RAG** - Basic retrieval-augmented generation with Azure AI Search
+   - **Streaming Toggle**: Enable real-time token-by-token response streaming
+3. **Demo 03: Agent with Tools** - Function calling patterns for extensibility
+4. **Demo 06: Agentic Retrieval** - Query planning with parallel search fanout
+5. **Demo 07: Multi-Agent Orchestration** - Specialized agents working together |
 
 **Demo 05 - Copilot Studio Plugin**: Standalone REST API that exposes the triage classification as a Copilot Studio action. Includes OpenAPI spec, authentication setup, and agent configuration. [Setup Guide →](demos/05-triage-plugin/COPILOT-STUDIO-SETUP.md)
+
+**Demo 06, 07 & 08 - Unified Fluent UI Interface**: Modern React app with real Microsoft Fluent UI components featuring Agentic Retrieval, Multi-Agent Orchestration, and Streaming RAG with real-time progressive answers. [Launch Guide →](demos/06-agentic-retrieval/README.md)
 
 ## Quick Start
 
@@ -244,28 +245,39 @@ az monitor app-insights query \
 ```
 espc25/
 ├── demos/
-│   ├── 01-triage-promptflow/      # Keyword classification (reference)
-│   ├── 02-rag-search/              # RAG endpoint (deployed)
-│   ├── 03-agent-with-tools/        # Function calling (reference)
-│   └── 04-real-ticket-creation/    # Email system (deployed)
+│   ├── 01-triage-promptflow/           # Keyword classification (reference)
+│   ├── 02-rag-search/                  # RAG endpoint (deployed)
+│   ├── 03-agent-with-tools/            # Function calling (reference)
+│   ├── 04-real-ticket-creation/        # Email system (deployed)
+│   ├── 05-triage-plugin/               # Copilot Studio integration (deployed)
+│   ├── 06-agentic-retrieval/           # Advanced RAG with Fluent UI (standalone)
+│   └── 07-multi-agent-orchestration/   # Multi-agent system (via Demo 06 UI)
 ├── infra/
-│   ├── main.bicep                  # Infrastructure definition
-│   └── modules/                    # Resource modules
+│   ├── main.bicep                      # Infrastructure definition
+│   └── modules/                        # Resource modules
 ├── scripts/
-│   ├── post-deploy.ps1                             # Link domain + deploy code
-│   ├── setup-graph-webhook.ps1                     # Configure webhook
-│   └── verify-deployment.ps1                       # Check deployment
+│   ├── deploy.ps1                      # One-command deployment
+│   ├── setup-graph-webhook.ps1         # Configure webhook
+│   └── verify-deployment.ps1           # Check deployment
 └── README.md
 ```
 
 ## Key Features
 
+### Production Email System (Demos 01-05)
 - **Event-Driven:** Real-time email processing via Graph webhooks
 - **Duplicate Prevention:** EmailMessageId as unique Table Storage RowKey
 - **Universal Compatibility:** Azure Communication Services works in all M365 tenants
 - **High-Quality Answers:** RAG with 0.7-0.9 confidence from 11 KB documents
 - **Auto-Triage:** Keyword-based classification (100% accuracy)
 - **Production Ready:** Monitoring, error handling, automated deployment
+
+### Advanced AI Patterns (Demos 06-07)
+- **Agentic Retrieval:** Query decomposition → Parallel search → Citation-based merging
+- **Multi-Agent Orchestration:** Triage → FAQ/RAG/Ticket routing with real Azure Table Storage tickets
+- **Fluent UI Interface:** Real Microsoft Fluent UI React components with tab navigation
+- **Progressive Enhancement:** Each demo showcases increasingly sophisticated AI patterns
+- **Ticket Management:** Demo 07 creates tickets with `Status='Agent Created'` for non-email workflows
 
 
 ## Contributing
@@ -276,6 +288,26 @@ This is a demonstration project. To adapt for your use case:
 2. **Modify Triage Rules:** Update keyword matching in `demos/04-real-ticket-creation/function/src/services/AIService.ts`
 3. **Add Custom Functions:** Create new tool endpoints in `demos/03-agent-with-tools/function-tool/src/`
 4. **Adjust Confidence Threshold:** Modify auto-resolve threshold in `GraphWebhook.ts` (currently 0.7)
+5. **Explore Advanced Patterns:** 
+   - Demo 06: Enhance with custom query planning strategies
+   - Demo 07: Add new agents or modify routing logic
+   - Fluent UI: Customize React components and styling
+
+## Running Advanced Demos
+
+### Demo 06 & 07: Fluent UI Interface
+
+```powershell
+cd demos\06-agentic-retrieval
+npm install
+npm run ui:react
+```
+
+Open `http://localhost:5173` for:
+- **Tab 1:** Agentic Retrieval (query decomposition + parallel search)
+- **Tab 2:** Multi-Agent Orchestration (triage → routing → response)
+
+Both use real Microsoft Fluent UI components with progressive result display.
 
 ## Additional Resources
 

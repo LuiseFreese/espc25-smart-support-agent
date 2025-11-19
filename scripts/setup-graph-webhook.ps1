@@ -71,14 +71,21 @@ $permissions = @(
     @{ name = "Mail.Send"; id = "e2a3a72e-5f79-4c64-b1b1-878b674786c9" }
 )
 
+# Get current permissions
+$currentPermissions = az ad app permission list --id $appId --query "[?resourceAppId=='$graphApiId'].resourceAccess[].id" -o tsv
+
 foreach ($perm in $permissions) {
-    Write-Host "  Adding $($perm.name)..." -ForegroundColor Gray
-    az ad app permission add `
-        --id $appId `
-        --api $graphApiId `
-        --api-permissions "$($perm.id)=Role" | Out-Null
+    if ($currentPermissions -contains $perm.id) {
+        Write-Host "  $($perm.name) already added - skipping" -ForegroundColor Gray
+    } else {
+        Write-Host "  Adding $($perm.name)..." -ForegroundColor Gray
+        az ad app permission add `
+            --id $appId `
+            --api $graphApiId `
+            --api-permissions "$($perm.id)=Role" | Out-Null
+    }
 }
-Write-Host "✓ Permissions added" -ForegroundColor Green
+Write-Host "✓ Permissions configured" -ForegroundColor Green
 
 # Step 4: Grant Admin Consent
 Write-Host "`n[Step 4/7] Granting Admin Consent..." -ForegroundColor Yellow
@@ -249,8 +256,8 @@ try {
     Write-Host "  - Subscription ID: $($result.subscriptionId)" -ForegroundColor Gray
     Write-Host "  - Expires: $($result.expirationDateTime)" -ForegroundColor Gray
 } catch {
-    Write-Host "⚠️  Could not create webhook subscription automatically" -ForegroundColor Yellow
-    Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "⚠️  Webhook creation failed (admin consent likely not granted yet)" -ForegroundColor Yellow
+    Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Gray
     Write-Host "`n  Retrying in 30 seconds (permissions may still be propagating)..." -ForegroundColor Yellow
     Start-Sleep -Seconds 30
     
@@ -264,8 +271,10 @@ try {
         Write-Host "  - Subscription ID: $($result.subscriptionId)" -ForegroundColor Gray
         Write-Host "  - Expires: $($result.expirationDateTime)" -ForegroundColor Gray
     } catch {
-        Write-Host "⚠️  Webhook subscription still failed after retry" -ForegroundColor Yellow
-        Write-Host "  You can create it manually with:" -ForegroundColor Yellow
+        Write-Host "⚠️  Webhook subscription requires admin consent first" -ForegroundColor Yellow
+        Write-Host "  This is expected - the app registration is configured, but Graph API" -ForegroundColor Gray
+        Write-Host "  permissions need to be granted before the webhook can be created." -ForegroundColor Gray
+        Write-Host "`n  After granting admin consent (step 10), create the webhook with:" -ForegroundColor Yellow
         Write-Host "  Invoke-RestMethod -Uri `"$subscriptionUrl`" -Method Post -Headers @{ 'x-functions-key' = '$functionKey' }" -ForegroundColor Gray
     }
 }

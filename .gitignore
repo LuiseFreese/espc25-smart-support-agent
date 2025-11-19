@@ -9,6 +9,7 @@ deploy-output.txt
 
 # Planning/Roadmap (internal use)
 ROADMAP.md
+IMPROVEMENT-IDEAS.md
 
 # Environment files
 .env

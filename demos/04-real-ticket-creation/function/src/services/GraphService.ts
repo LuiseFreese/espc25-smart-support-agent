@@ -38,7 +38,7 @@ export class GraphService {
     // Convert **bold** to <strong>
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-    // Convert numbered lists (1. item\n2. item) to <ol>
+    // Convert numbered lists to bullet lists (ul instead of ol)
     const lines = html.split('\n');
     let inList = false;
     const processedLines: string[] = [];
@@ -49,13 +49,13 @@ export class GraphService {
 
       if (numberedListMatch) {
         if (!inList) {
-          processedLines.push('<ol>');
+          processedLines.push('<ul>');
           inList = true;
         }
         processedLines.push(`<li>${numberedListMatch[2]}</li>`);
       } else {
         if (inList) {
-          processedLines.push('</ol>');
+          processedLines.push('</ul>');
           inList = false;
         }
         if (line) {
@@ -65,7 +65,7 @@ export class GraphService {
     }
 
     if (inList) {
-      processedLines.push('</ol>');
+      processedLines.push('</ul>');
     }
 
     html = processedLines.join('\n');
@@ -142,8 +142,10 @@ export class GraphService {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .logo { text-align: center; padding: 20px; background: white; }
+    .logo img { max-width: 200px; height: auto; }
     .header { background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
     .header h1 { margin: 0; font-size: 24px; }
     .ticket-badge { background: white; color: #0078d4; padding: 5px 12px; border-radius: 4px; display: inline-block; font-weight: bold; margin-top: 10px; }
@@ -153,8 +155,8 @@ export class GraphService {
     .footer { background: #f3f3f3; padding: 15px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
     .button { background: #0078d4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 10px 0; }
     .button:hover { background: #005a9e; }
-    ol { padding-left: 20px; }
-    ol li { margin: 10px 0; }
+    ul { padding-left: 20px; }
+    ul li { margin: 10px 0; }
     strong { color: #0078d4; }
     a { color: #0078d4; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -162,8 +164,11 @@ export class GraphService {
 </head>
 <body>
   <div class="container">
+    <div class="logo">
+      <img src="https://raw.githubusercontent.com/LuiseFreese/espc25-smart-support-agent/main/demos-ui/public/espc-logo.png" alt="ESPC Logo" />
+    </div>
     <div class="header">
-      <h1>✅ Support Request Received</h1>
+      <h1>Support Request Received</h1>
       <div class="ticket-badge">Ticket ${ticketId}</div>
     </div>
 
@@ -172,7 +177,7 @@ export class GraphService {
       <p>Thank you for contacting support. We've analyzed your request and found a solution in our knowledge base.</p>
 
       <div class="solution-box">
-        <h2>📋 Recommended Solution</h2>
+        <h2>Recommended Solution</h2>
         ${htmlBody}
       </div>
 
@@ -185,7 +190,7 @@ export class GraphService {
     </div>
 
     <div class="footer">
-      <p>This is an automated response powered by AI 🤖</p>
+      <p>This is an automated response powered by AI</p>
       <p>Best regards,<br><strong>IT Support Team</strong></p>
     </div>
   </div>
@@ -264,7 +269,7 @@ export class GraphService {
 <body>
   <div class="container">
     <div class="alert-header">
-      <h1>⚠️ Manual Review Required - Low Confidence Response</h1>
+      <h1>Manual Review Required - Low Confidence Response</h1>
     </div>
 
     <div class="metadata">

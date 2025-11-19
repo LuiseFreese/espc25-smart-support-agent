@@ -1,0 +1,36 @@
+{
+    "name": "demos-ui-backend",
+    "version": "1.0.0",
+    "description": "Unified backend server for all 8 demos",
+    "type": "module",
+    "main": "dist/server-unified.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/server-unified.js",
+        "dev": "tsc && node dist/server-unified.js"
+    },
+    "keywords": [
+        "azure",
+        "openai",
+        "demos",
+        "backend"
+    ],
+    "author": "Luise Freese",
+    "license": "MIT",
+    "dependencies": {
+        "@azure/search-documents": "^12.0.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.0.0",
+        "express": "^4.21.2",
+        "multer": "^1.4.5-lts.1",
+        "openai": "^4.20.0"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "@types/express": "^4.17.25",
+        "@types/multer": "^1.4.13",
+        "@types/node": "^20.0.0",
+        "ts-node": "^10.9.0",
+        "typescript": "^5.0.0"
+    }
+}

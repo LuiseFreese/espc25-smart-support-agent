@@ -29,15 +29,24 @@ search_endpoint = os.getenv("AZURE_AI_SEARCH_ENDPOINT")
 search_key = os.getenv("AZURE_AI_SEARCH_API_KEY")  # Still needed for index creation (admin operation)
 index_name = os.getenv("AZURE_AI_SEARCH_INDEX", "kb-support")
 
-# Use DefaultAzureCredential for OpenAI (works locally via Azure CLI, in Azure via Managed Identity)
-credential = DefaultAzureCredential()
-token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-
-openai_client = AzureOpenAI(
-    azure_ad_token_provider=token_provider,
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-)
+# Use API key if available (for deployment script), otherwise use DefaultAzureCredential (for local dev)
+openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+if openai_api_key:
+    # Use API key authentication (deployment scenario)
+    openai_client = AzureOpenAI(
+        api_key=openai_api_key,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
+else:
+    # Use DefaultAzureCredential for OpenAI (local development via Azure CLI)
+    credential = DefaultAzureCredential()
+    token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+    openai_client = AzureOpenAI(
+        azure_ad_token_provider=token_provider,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
 
 print(f"\n{'='*70}")
 print(f"Demo 02 - Knowledge Base Ingestion")
