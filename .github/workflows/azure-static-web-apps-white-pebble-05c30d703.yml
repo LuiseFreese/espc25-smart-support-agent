@@ -32,6 +32,9 @@ jobs:
           api_location: "" # Api source code path - optional
           output_location: "dist" # Built app content directory - optional
           ###### End of Repository/Build Configurations ######
+        env:
+          VITE_API_BASE_URL: "https://func-agents-7egpzzovabxku.azurewebsites.net"
+          VITE_RAG_API_BASE_URL: "https://func-rag-7egpzzovabxku.azurewebsites.net"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
