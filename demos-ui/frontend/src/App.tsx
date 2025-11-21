@@ -249,6 +249,8 @@ interface Demo03Result {
     role: string;
     content: string;
   }>;
+  error?: string;
+  hint?: string;
   usage?: { prompt: number; completion: number; total: number };
 }
 
@@ -266,6 +268,8 @@ interface Demo07Result {
   agents?: string[];
   finalResponse?: string;
   ticketId?: string;
+  error?: string;
+  hint?: string;
   usage?: { prompt: number; completion: number; total: number };
 }
 
@@ -479,10 +483,22 @@ export default function App() {
         body: JSON.stringify({ question: question03 }),
       });
 
+      // Handle 503 Service Unavailable (demo not available in cloud)
+      if (response.status === 503) {
+        const errorData = await response.json();
+        setResult03({ 
+          error: errorData.error || 'Service unavailable',
+          hint: errorData.hint || 'This demo is not available in the cloud deployment.'
+        });
+        setLoading03(false);
+        return;
+      }
+
       const data = await response.json();
       setResult03(data);
     } catch (error) {
       console.error('Error:', error);
+      setResult03({ error: 'Failed to process request', hint: String(error) });
     } finally {
       setLoading03(false);
     }
@@ -575,10 +591,22 @@ export default function App() {
         body: JSON.stringify({ question: question07 }),
       });
 
+      // Handle 503 Service Unavailable (demo not available in cloud)
+      if (response.status === 503) {
+        const errorData = await response.json();
+        setResult07({ 
+          error: errorData.error || 'Service unavailable',
+          hint: errorData.hint || 'This demo is not available in the cloud deployment.'
+        });
+        setLoading07(false);
+        return;
+      }
+
       const data = await response.json();
       setResult07(data);
     } catch (error) {
       console.error('Error:', error);
+      setResult07({ error: 'Failed to process request', hint: String(error) });
     } finally {
       setLoading07(false);
     }
