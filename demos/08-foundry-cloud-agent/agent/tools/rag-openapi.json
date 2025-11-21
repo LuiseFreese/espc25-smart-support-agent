@@ -1,0 +1,118 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Enterprise Search RAG API",
+    "description": "Query the knowledge base using hybrid vector + semantic search",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://func-rag-7egpzzovabxku.azurewebsites.net",
+      "description": "Azure Function App endpoint for RAG search (replace {uniqueid} with your actual function app ID)"
+    }
+  ],
+  "paths": {
+    "/api/rag-search": {
+      "post": {
+        "operationId": "searchKnowledgeBase",
+        "summary": "Search the knowledge base for answers",
+        "description": "Performs hybrid vector + semantic search on Azure AI Search and returns answer with confidence score",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "question"
+                ],
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "The user's question to search for",
+                    "example": "How do I reset my password?"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful search with answer and citations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "answer": {
+                      "type": "string",
+                      "description": "The generated answer based on KB content"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "format": "float",
+                      "description": "Confidence score (0.0-1.0) based on search relevance"
+                    },
+                    "citations": {
+                      "type": "array",
+                      "description": "Source documents used to generate the answer",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Document title"
+                          },
+                          "content": {
+                            "type": "string",
+                            "description": "Relevant excerpt from the document"
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "answer": "To reset your password, visit portal.contoso.com/reset, enter your email, and follow the instructions sent to your inbox.",
+                  "confidence": 0.85,
+                  "citations": [
+                    {
+                      "title": "password-reset.md",
+                      "content": "Users can reset passwords by visiting the self-service portal...",
+                      "score": 3.2
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "functionKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-functions-key"
+      }
+    }
+  }
+}

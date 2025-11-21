@@ -4,21 +4,22 @@
 
 An **event-driven IT support automation system** that processes support emails, classifies them, searches a knowledge base, and automatically responds or escalates based on confidence scores.
 
-### Six Progressive Demos
+### Progressive Demo Architecture (8 Demos)
 
 1. **Demo 01: Triage** - Keyword-based classification (Network/Access/Billing/Software)
 2. **Demo 02: RAG Search** - Knowledge base retrieval with confidence scoring
    - **Streaming Mode**: Optional real-time token-by-token response streaming via toggle
-   - **Multi-Modal**: Optional image upload for visual analysis (GPT-4o-mini vision capabilities)
+   - **Multi-Modal**: Optional image upload for visual analysis (GPT-5.1-chat vision capabilities)
 3. **Demo 03: Agent Tools** - Function calling patterns for extensibility
-4. **Demo 04: Production** - Complete email automation (MAIN SYSTEM)
+4. **Demo 04: Production** - Complete email automation (MAIN PRODUCTION SYSTEM)
 5. **Demo 05: Copilot Plugin** - Triage + RAG endpoints for Copilot Studio (deployed to func-agents)
 6. **Demo 06: Agentic Retrieval** - Query planning, parallel search fanout, result merging with citations
 7. **Demo 07: Multi-Agent Orchestration** - Local orchestrator with Triage/FAQ/RAG/Ticket agents
+8. **Demo 08: Foundry Cloud Agent** - Azure AI Foundry hosted agent with cloud-based orchestration
 
-**Tech Stack:** Azure AI Foundry • Azure OpenAI (GPT-4o-mini) • Azure AI Search • Azure Functions (Node.js 20 + Python 3.11) • Table Storage • Application Insights
+**Tech Stack:** Azure AI Foundry • Azure OpenAI (GPT-5.1-chat, text-embedding-3-large) • Azure AI Search • Azure Functions (Node.js 20 + Python 3.11) • Table Storage • Application Insights • Azure Communication Services
 
-**Region:** Sweden Central (required for GPT-4o-mini)
+**Region:** Sweden Central (required for GPT-5.1-chat model availability)
 
 ## Key Architecture Patterns
 
@@ -172,6 +173,79 @@ docs/                       # Architecture documentation
 - **Table Storage Keys:** PartitionKey always `'TICKET'`, RowKey is sanitized EmailMessageId or generated ID
 - **RAG Search Pattern:** Hybrid search (vector + semantic) with k=50 for RRF fusion
 
+### TypeScript Function Patterns
+
+**Function Registration:** All Azure Functions must be registered in `src/index.ts` using Azure Functions v4 model:
+```typescript
+import { app } from '@azure/functions';
+import { GraphWebhook } from './functions/GraphWebhook';
+
+app.http('GraphWebhook', {
+  methods: ['POST', 'GET'],
+  authLevel: 'anonymous',  // Only for webhooks requiring external validation
+  handler: GraphWebhook
+});
+```
+
+**Service Architecture:** Business logic lives in `src/services/`, not in function handlers:
+- `AIService.ts` - Triage classification + RAG search HTTP client
+- `GraphService.ts` - Microsoft Graph API + Azure Communication Services
+- `TableStorageService.ts` - Table Storage CRUD with deduplication logic
+
+**Critical Deduplication Pattern:** EmailMessageId MUST be used as Table Storage RowKey to prevent duplicate processing:
+```typescript
+// In TableStorageService.ts
+const rowKey = ticket.EmailMessageId 
+  ? ticket.EmailMessageId.replace(/[^a-zA-Z0-9-]/g, '_')  // Sanitize for Table Storage
+  : `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const entity = {
+  partitionKey: 'TICKET',  // ALWAYS 'TICKET' - do not use dynamic partition keys
+  rowKey: rowKey,
+  EmailMessageId: ticket.EmailMessageId || ''
+};
+```
+
+### Python RAG Function Patterns
+
+**Azure SDK Authentication:** Prefer Managed Identity over API keys:
+```python
+# Try API key first (for local dev), fallback to Managed Identity
+if openai_api_key:
+    openai_client = AzureOpenAI(api_key=openai_api_key, ...)
+else:
+    credential = DefaultAzureCredential()
+    token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+    openai_client = AzureOpenAI(azure_ad_token_provider=token_provider, ...)
+```
+
+**Semantic Search Score Mapping:** Critical for confidence-based routing (in `function_app.py` lines 80-150):
+```python
+# Semantic reranker score (0-4 range) maps to confidence
+reranker_score = result.get("@search.reranker_score")  # Note: underscore, not camelCase!
+if reranker_score is not None:
+    if reranker_score >= 3.0: confidence = 0.95
+    elif reranker_score >= 2.5: confidence = 0.85
+    elif reranker_score >= 2.0: confidence = 0.75
+    else: confidence = 0.60
+```
+
+**Hybrid Search Configuration:** Always use both vector and semantic ranking:
+```python
+results = search_client.search(
+    search_text=question,
+    vector_queries=[{
+        "kind": "vector",
+        "vector": question_embedding,
+        "fields": "contentVector",
+        "k": 50  # High k for better RRF fusion
+    }],
+    query_type="semantic",
+    semantic_configuration_name="semantic-config",
+    top=50
+)
+```
+
 ## Essential Commands
 
 ### Local Development
@@ -222,12 +296,30 @@ func azure functionapp publish func-rag-<uniqueid>
 
 **Key Difference:** Python function uses Azure SDK patterns (SearchClient, AzureOpenAI client) vs TypeScript uses REST API calls
 
-### Deployment
+## Deployment
+
 ```powershell
 # One-command deployment (RECOMMENDED - 15 minutes hands-off)
 .\scripts\deploy.ps1 -SubscriptionId "<your-sub-id>" -SupportEmail "support@domain.com"
+```
 
-# Manual step-by-step:
+This script automatically:
+1. Forces fresh Azure authentication (`az logout` then `az login`)
+2. Validates prerequisites (Azure CLI, Node.js, Azure Functions Core Tools)
+3. Purges soft-deleted Cognitive Services and Key Vaults
+4. Deploys infrastructure with retry logic for transient failures
+5. Links Communication Services domain
+6. Ingests knowledge base (11 markdown docs → Azure AI Search)
+7. Builds and deploys TypeScript function code
+8. Builds and deploys Python RAG function
+9. Creates Microsoft Graph app registration with Mail.Read/Mail.Send permissions
+10. Auto-configures RAG_API_KEY (critical - prevents 0.3 fallback responses)
+11. Creates webhook subscription (3-day expiration)
+12. Verifies full deployment health
+
+**Critical Post-Deployment:** The deploy script handles RAG_API_KEY configuration automatically. If deploying manually, you MUST run `setup-graph-webhook.ps1` or RAG will return 0.3 confidence (fallback) for all queries.
+
+### Manual step-by-step:
 
 # 1. Deploy infrastructure
 cd infra
@@ -262,6 +354,36 @@ cd ..\..\scripts
 | Add KB document | See "Knowledge Base Update Process" below |
 | Update infrastructure | Modify `infra/modules/*.bicep`, redeploy with `az deployment sub create` |
 | Renew webhook (expires 3 days) | POST to `/api/managesubscription` endpoint |
+| Test demos locally | Use VS Code tasks: "Start Unified Demo UI" launches frontend + backend |
+| Deploy single function | `cd demos/XX-name/function && npm run build && func azure functionapp publish func-name` |
+
+### Demo UI Development (Demos 06-08)
+
+**Unified Fluent UI:** Modern React app with real Microsoft Fluent UI components located in `demos-ui/`:
+- **Frontend:** Vite + React + Fluent UI v9 (`demos-ui/frontend/`)
+- **Backend:** Express.js serving all demo endpoints (`demos-ui/backend/src/server-unified.ts`)
+- **Start Both:** Use VS Code task "Start Unified Demo UI" or manually:
+  ```powershell
+  # Terminal 1
+  cd demos-ui/frontend && npm run dev
+  
+  # Terminal 2  
+  cd demos-ui/backend && npm run dev
+  ```
+
+**Demo 06 Architecture (Agentic Retrieval):**
+- `queryPlanning.ts` - LLM decomposes complex questions into 2-4 focused queries
+- `searchFanout.ts` - Executes queries in parallel against Azure AI Search
+- `mergeResults.ts` - Combines results with citation tracking
+- **Pattern:** Plan → Parallel Search → Merge with Citations
+
+**Demo 07 Architecture (Multi-Agent Orchestration):**
+- `orchestrator.ts` - Routes queries to specialized agents based on intent
+- `agents/triageAgent.ts` - Classifies user intent (FAQ, RAG, Ticket)
+- `agents/faqAgent.ts` - Pattern matching for common questions
+- `agents/ragAgent.ts` - Full RAG pipeline for knowledge base queries
+- `agents/ticketAgent.ts` - Ticket creation workflow
+- **Pattern:** Intent Classification → Specialized Agent → Coordinated Response
 
 ### Knowledge Base Update Process
 
@@ -362,6 +484,42 @@ curl https://func-agents-<id>.azurewebsites.net/api/ping-storage
 - **Other Endpoints:** Use `authLevel: 'function'` (requires function key)
 - **Managed Identity:** Use for Azure resource access (no API keys)
 
+### Email Processing Flow Deep Dive
+
+**Webhook Lifecycle:**
+1. **Validation:** Graph API calls webhook with `?validationToken=xxx` query parameter
+2. **GraphWebhook Function:** Responds with plain text token (200 OK)
+3. **Active Subscription:** Graph sends POST notifications for 3 days, then expires
+4. **Renewal:** Call `/api/managesubscription` endpoint (POST creates, GET checks status)
+
+**Change Notification Format:**
+```json
+{
+  "value": [{
+    "changeType": "created",
+    "resource": "Users/{userId}/Messages/{messageId}"
+  }]
+}
+```
+
+**Processing Pipeline in GraphWebhook.ts:**
+1. **Extract MessageId:** Parse from `resource` field using regex
+2. **Fetch Full Email:** Call Graph API `getEmailById(messageId)`
+3. **Loop Prevention:** Skip if `from.emailAddress` matches `SUPPORT_EMAIL_ADDRESS`
+4. **Duplicate Check:** Query Table Storage by EmailMessageId (O(1) lookup via RowKey)
+5. **Triage:** Keyword matching → Category + Priority
+6. **RAG Search:** HTTP POST to Python function → Answer + Confidence
+7. **Create Ticket:** Store in Table Storage with sanitized EmailMessageId as RowKey
+8. **Route Decision:** 
+   - Confidence ≥0.7: Send auto-reply via Communication Services
+   - Confidence <0.7: Forward to support team via Graph API
+9. **Mark as Read:** Call Graph API to update message status
+
+**Why This Architecture:**
+- **Deduplication:** EmailMessageId as RowKey = automatic duplicate prevention (Table Storage constraint)
+- **Two Email Services:** Graph (read) + Communication Services (send) = tenant compatibility
+- **Confidence Threshold:** 0.7 balances automation vs. quality (based on semantic reranker scoring)
+
 ## Authentication Architecture
 
 **Production uses TWO authentication patterns:**
@@ -386,4 +544,87 @@ curl https://func-agents-<id>.azurewebsites.net/api/ping-storage
 - `docs/AUTHENTICATION-ARCHITECTURE.md` - Complete authentication guide
 - `infra/modules/role-assignments.bicep` - RBAC configuration
 - `scripts/setup-graph-webhook.ps1` - Graph API app registration
+
+## Development Best Practices
+
+### When Adding New Features
+
+1. **New Azure Function:**
+   - Create handler in `demos/04-real-ticket-creation/function/src/functions/NewFunction.ts`
+   - Register in `src/index.ts` with `app.http('functionName', {...})`
+   - Set appropriate `authLevel`: `'anonymous'` only for webhooks, `'function'` for everything else
+   - Deploy: `npm run build && func azure functionapp publish func-agents-<id>`
+
+2. **Modify RAG Logic:**
+   - Edit `demos/02-rag-search/rag-function/function_app.py`
+   - Test locally: `func start` (requires `.venv` activation)
+   - Deploy: `func azure functionapp publish func-rag-<id>`
+
+3. **Update Infrastructure:**
+   - Modify Bicep files in `infra/modules/`
+   - Test with WhatIf: `az deployment sub what-if --template-file infra/main.bicep`
+   - Deploy: `az deployment sub create --template-file infra/main.bicep`
+   - Always use subscription-level deployment (not resource group)
+
+### Critical Debugging Patterns
+
+**RAG Returns 0.3 (Fallback) Confidence:**
+```powershell
+# Check if RAG_API_KEY is configured
+az functionapp config appsettings list --name func-agents-<id> --query "[?name=='RAG_API_KEY']"
+
+# If missing, re-run setup
+.\scripts\setup-graph-webhook.ps1 -ResourceGroup rg-smart-agents-dev
+```
+
+**Email Not Processing:**
+1. Check webhook status: `GET https://func-agents-<id>.azurewebsites.net/api/managesubscription`
+2. View logs: Application Insights → Transaction Search
+3. Verify domain linked: Azure Portal → Communication Services → Domains
+4. Check Graph permissions: Azure Portal → App Registrations → API Permissions
+
+**Duplicate Emails:**
+- Verify latest code deployed (deduplication logic added Nov 2024)
+- Check Table Storage for EmailMessageId values
+- Pattern: RowKey should match sanitized EmailMessageId
+
+### Testing Workflow
+
+**Local Testing (Before Deployment):**
+```powershell
+# Test RAG function locally
+cd demos/02-rag-search/rag-function
+func start
+# In another terminal:
+curl -X POST http://localhost:7071/api/rag-search `
+  -H "Content-Type: application/json" `
+  -d '{"question": "How do I reset my password?"}'
+
+# Test TypeScript functions locally
+cd demos/04-real-ticket-creation/function
+npm run build
+func start
+```
+
+**Integration Testing (Deployed System):**
+```powershell
+# Full deployment verification
+.\scripts\verify-deployment.ps1 -ResourceGroup rg-smart-agents-dev
+
+# RAG endpoint test
+.\tests\test-demo02-rag.ps1
+
+# E2E email flow test
+.\tests\e2e-test.ps1
+```
+
+### VS Code Tasks
+
+**Available Tasks (`.vscode/tasks.json`):**
+- **"Start Unified Demo UI"** - Launches frontend + backend for Demos 06-08
+- **"Run Demo 01 - Triage"** - Tests keyword classification
+- **"Run Demo 02 - Ingest KB"** - Uploads markdown docs to Azure AI Search
+- **"Start Demo 03 - Functions"** - Local function app for agent tools demo
+
+**Usage:** Terminal → Run Task → Select from list
 

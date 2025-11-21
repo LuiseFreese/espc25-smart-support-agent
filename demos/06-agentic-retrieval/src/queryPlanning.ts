@@ -39,8 +39,7 @@ Rules:
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3,
-        max_tokens: 200
+        max_completion_tokens: 200
     });
 
     const content = response.choices[0]?.message?.content || '';

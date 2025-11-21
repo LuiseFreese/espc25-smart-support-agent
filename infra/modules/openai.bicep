@@ -8,13 +8,13 @@ param location string
 param sku string = 'S0'
 
 @description('GPT deployment name')
-param gptDeploymentName string = 'gpt-4o-mini'
+param gptDeploymentName string = 'gpt-5-1-chat'
 
 @description('GPT model name')
-param gptModelName string = 'gpt-4o-mini'
+param gptModelName string = 'gpt-5.1-chat'
 
 @description('GPT model version')
-param gptModelVersion string = '2024-07-18'
+param gptModelVersion string = '2025-11-13'
 
 @description('GPT deployment capacity')
 param gptDeploymentCapacity int = 10
@@ -51,7 +51,7 @@ resource gptDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05
   parent: openAIAccount
   name: gptDeploymentName
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: gptDeploymentCapacity
   }
   properties: {

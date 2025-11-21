@@ -15,7 +15,7 @@ This demo shows an autonomous agent using Azure OpenAI function calling to execu
 
 **Purpose:** Provides the agent's reasoning and tool selection capabilities
 
-**Model:** `gpt-4o-mini` with function calling support
+**Model:** `gpt-5.1-chat` with function calling support
 
 **How Function Calling Works:**
 
@@ -56,7 +56,7 @@ Model responds: "Your order is shipped! Tracking number is UPS12345, expected de
 
 **Cost:** ~$0.0003 per query (includes tool selection + final answer generation)
 
-**Why GPT-4o-mini:**
+**Why GPT-5.1-chat:**
 - Native function calling support (no prompt hacks needed)
 - Fast decision-making (<1s to choose tool)
 - Cost-effective for high-volume agent workloads
@@ -192,7 +192,7 @@ const apiKey = process.env.EXTERNAL_API_KEY; // Pulled from Key Vault
 
 ```mermaid
 flowchart TD
-    A["User Query:<br/>'Where is my order 12345?'"] --> B[Azure OpenAI<br/>gpt-4o-mini]
+    A["User Query:<br/>'Where is my order 12345?'"] --> B[Azure OpenAI<br/>gpt-5.1-chat]
     
     B --> B1{Analyze Query}
     B1 --> B2["Available tools:<br/>- GetOrderStatus<br/>- CreateTicket"]
@@ -204,7 +204,7 @@ flowchart TD
     C1 --> C2["Query order database"]
     C2 --> C3["Return:<br/>{status: 'shipped',<br/>tracking: 'UPS12345'}"]
     
-    C3 --> D[Azure OpenAI<br/>gpt-4o-mini]
+    C3 --> D[Azure OpenAI<br/>gpt-5.1-chat]
     D --> D1["Synthesize response:<br/>'Your order is shipped!<br/>Tracking: UPS12345'"]
     
     D1 --> E[Application Insights]
@@ -367,7 +367,7 @@ Ensure `.env` in workspace root contains:
 ```env
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<your-key>
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 AZURE_FUNCTION_APP_URL=http://localhost:7071/api
 ```
 
@@ -454,7 +454,7 @@ Assistant: Your order 12345 is currently in transit. The expected delivery date 
 **Per Agent Interaction**:
 - **Input tokens**: ~200 tokens (query + tool definitions + context)
 - **Output tokens**: ~150 tokens (tool call + final answer)
-- **Azure OpenAI cost**: ~$0.0004 per query (gpt-4o-mini: $0.150 input + $0.600 output per 1M tokens)
+- **Azure OpenAI cost**: ~$0.0016 per query (gpt-5.1-chat: $2.50 input + $10.00 output per 1M tokens)
 - **Azure Functions cost**: ~$0.000001 per function call (consumption plan)
 - **Total**: ~$0.0004 per agent interaction
 
@@ -538,7 +538,7 @@ customEvents
 
 ### Function Calling Testing
 
-Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-4o-mini` and mock tool implementations.
+Tested Azure OpenAI function calling with 4 diverse scenarios using `gpt-5.1-chat` and mock tool implementations.
 
 #### Test Results
 

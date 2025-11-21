@@ -17,7 +17,7 @@ export async function runRag(question: string): Promise<AgentResponse> {
 
     const openaiEndpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim()!;
     const openaiKey = process.env.AZURE_OPENAI_API_KEY?.trim()!;
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
     // Initialize clients
     const searchClient = new SearchClient(
@@ -68,9 +68,13 @@ export async function runRag(question: string): Promise<AgentResponse> {
                 content: question
             }
         ],
-        temperature: 0.3,
-        max_tokens: 500
+        max_completion_tokens: 500
     });
+
+    // Log token usage
+    if (completion.usage) {
+        console.log(`📊 RAG Agent tokens: prompt=${completion.usage.prompt_tokens}, completion=${completion.usage.completion_tokens}, total=${completion.usage.total_tokens}`);
+    }
 
     const answer = completion.choices[0]?.message?.content || 'No answer generated.';
 
@@ -81,7 +85,12 @@ export async function runRag(question: string): Promise<AgentResponse> {
         text: answer,
         confidence,
         meta: {
-            passagesFound: passages.length
+            passagesFound: passages.length,
+            usage: completion.usage ? {
+                prompt: completion.usage.prompt_tokens || 0,
+                completion: completion.usage.completion_tokens || 0,
+                total: completion.usage.total_tokens || 0
+            } : undefined
         }
     };
 }

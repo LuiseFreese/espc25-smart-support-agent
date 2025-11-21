@@ -61,8 +61,7 @@ Answer the question using only these passages. Include citations.`;
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
-        temperature: 0.2,
-        max_tokens: 500
+        max_completion_tokens: 500
     });
 
     return response.choices[0]?.message?.content || 'Unable to generate answer.';

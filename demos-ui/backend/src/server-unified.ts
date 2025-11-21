@@ -7,15 +7,40 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { spawn } from 'child_process';
 
+// Get __dirname first (needed for path.join below)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from multiple .env files
+dotenv.config(); // Load from demos-ui/backend/.env
+dotenv.config({ path: path.join(__dirname, '../../../demos/07-multi-agent-orchestration/.env') }); // Load Demo 07 .env
+
 // Demo 06 imports
 import { planQueries } from './queryPlanning.js';
 import { runSearchFanout } from './searchFanout.js';
 import { mergeResults } from './mergeResults.js';
 
-dotenv.config();
+// Demo 07 imports (use compiled dist folder to avoid TypeScript rootDir issues)
+import { runMultiAgentOrchestrator } from '../../../demos/07-multi-agent-orchestration/dist/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Simple rate limiter to prevent quota exhaustion
+const requestTimestamps: number[] = [];
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_MINUTE = 3; // Conservative: Demo 06 makes 2+ OpenAI calls per request
+
+function checkRateLimit(): boolean {
+    const now = Date.now();
+    // Remove timestamps older than 1 minute
+    while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW_MS) {
+        requestTimestamps.shift();
+    }
+    // Check if under limit
+    if (requestTimestamps.length >= MAX_REQUESTS_PER_MINUTE) {
+        return false; // Rate limit exceeded
+    }
+    requestTimestamps.push(now);
+    return true; // OK to proceed
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,6 +88,14 @@ app.get('/unified', (req, res) => {
 // Demo 02: Simple RAG with optional image upload (multi-modal)
 app.post('/api/simple-rag', optionalUpload, async (req, res) => {
     try {
+        // Rate limit check
+        if (!checkRateLimit()) {
+            res.status(429).json({ 
+                error: 'Rate limit exceeded. Please wait a minute before trying again.',
+                hint: 'You are hitting the Azure OpenAI quota limit. Wait 60 seconds or request a quota increase.'
+            });
+            return;
+        }
         // Handle both JSON and multipart requests
         let question: string;
         const imageFile = req.file;
@@ -87,7 +120,7 @@ app.post('/api/simple-rag', optionalUpload, async (req, res) => {
         if (imageFile) {
             console.log('🖼️ Image uploaded:', imageFile.originalname, `(${imageFile.size} bytes)`);
             
-            const visionDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+            const visionDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
             const base64Image = imageFile.buffer.toString('base64');
             const dataUrl = `data:${imageFile.mimetype};base64,${base64Image}`;
 
@@ -103,17 +136,17 @@ app.post('/api/simple-rag', optionalUpload, async (req, res) => {
                         messages: [
                             {
                                 role: 'system',
-                                content: 'You are an IT support assistant analyzing images. Describe what you see and identify any errors, issues, or technical details.'
+                                content: 'You are an image analyzer for an IT support system. Extract key information: what error code/message is shown? What UI elements are visible? What actions were being performed? Keep descriptions factual and concise - DO NOT provide troubleshooting advice yet.'
                             },
                             {
                                 role: 'user',
                                 content: [
-                                    { type: 'text', text: question },
-                                    { type: 'image_url', image_url: { url: dataUrl } }
+                                    { type: 'text', text: `Describe what you see in this image related to: ${question}` },
+                                    { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } }
                                 ]
                             }
                         ],
-                        max_tokens: 500,
+                        max_completion_tokens: 300
                     }),
                 }
             );
@@ -124,6 +157,12 @@ app.post('/api/simple-rag', optionalUpload, async (req, res) => {
 
             const visionData = await visionResponse.json();
             visualAnalysis = visionData.choices[0].message.content;
+            
+            // Log token usage
+            if (visionData.usage) {
+                console.log(`📊 Vision API tokens: prompt=${visionData.usage.prompt_tokens}, completion=${visionData.usage.completion_tokens}, total=${visionData.usage.total_tokens}`);
+            }
+            
             console.log('👁️ Vision analysis completed');
             baseConfidence = 0.75; // Higher base confidence with visual context
         }
@@ -182,7 +221,7 @@ app.post('/api/triage', async (req, res) => {
 
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint) {
             throw new Error('AZURE_OPENAI_ENDPOINT not configured');
@@ -223,8 +262,7 @@ Respond ONLY with valid JSON in this exact format:
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: ticketText }
                 ],
-                temperature: 0.3,
-                max_tokens: 200
+                max_completion_tokens: 200
             })
         });
 
@@ -246,7 +284,12 @@ Respond ONLY with valid JSON in this exact format:
         res.json({
             category: result.category,
             priority: result.priority,
-            reasoning: result.reasoning
+            reasoning: result.reasoning,
+            usage: {
+                prompt: data.usage?.prompt_tokens || 0,
+                completion: data.usage?.completion_tokens || 0,
+                total: data.usage?.total_tokens || 0
+            }
         });
 
     } catch (error) {
@@ -360,8 +403,24 @@ app.post('/api/agent-tools', async (req, res) => {
             }
 
             // Extract final answer (capture everything after "✅ Assistant:" until end or [TELEMETRY])
-            const answerMatch = output.match(/✅ Assistant:\s*([\s\S]+?)(?=\n\[TELEMETRY\]|$)/);
+            const answerMatch = output.match(/✅ Assistant:\s*([\s\S]+?)(?=\n\[📊 Total usage|\n\[JSON_OUTPUT\]|\n\[TELEMETRY\]|$)/);
             const answer = answerMatch ? answerMatch[1].trim() : 'Agent completed successfully';
+
+            // Extract usage from JSON output
+            const jsonMatch = output.match(/\[JSON_OUTPUT\](.+?)\[\/JSON_OUTPUT\]/);
+            let usage: { prompt: number; completion: number; total: number } | undefined;
+            
+            if (jsonMatch) {
+                try {
+                    const jsonData = JSON.parse(jsonMatch[1]);
+                    if (jsonData.usage) {
+                        usage = jsonData.usage;
+                        console.log(`[Demo 03] Extracted usage: prompt=${usage!.prompt}, completion=${usage!.completion}, total=${usage!.total}`);
+                    }
+                } catch (error) {
+                    console.error('[Demo 03] Failed to parse JSON output:', error);
+                }
+            }
 
             // Extract user message
             const userMatch = output.match(/💬 User:\s*(.+?)(?=\n|$)/);
@@ -378,6 +437,7 @@ app.post('/api/agent-tools', async (req, res) => {
                 answer,
                 toolCalls,
                 conversationFlow,
+                usage,
                 rawOutput: output // Include for debugging
             });
         });
@@ -417,23 +477,54 @@ app.post('/api/agentic-search', async (req, res) => {
 
         console.log('[Demo 06] Starting agentic search for:', question);
 
-        // Step 1: Plan queries
-        const queries = await planQueries(question);
-        console.log('[Demo 06] Planned queries:', queries);
-        res.write(JSON.stringify({ type: 'queries', data: queries }) + '\n');
+        // Track total token usage
+        let totalUsage = { prompt: 0, completion: 0, total: 0 };
 
-        // Step 2: Run parallel search
-        const passages = await runSearchFanout(queries);
-        console.log('[Demo 06] Found passages:', passages.length);
-        res.write(JSON.stringify({ type: 'passages', data: passages }) + '\n');
+        try {
+            // Step 1: Plan queries
+            const planResult = await planQueries(question);
+            const queries = planResult.queries;
+            totalUsage.prompt += planResult.usage.prompt;
+            totalUsage.completion += planResult.usage.completion;
+            totalUsage.total += planResult.usage.total;
+            console.log('[Demo 06] Planned queries:', queries);
+            res.write(JSON.stringify({ type: 'queries', data: queries }) + '\n');
 
-        // Step 3: Merge results
-        const answer = await mergeResults(question, passages);
-        console.log('[Demo 06] Generated answer:', answer.substring(0, 100) + '...');
-        res.write(JSON.stringify({ type: 'answer', data: answer }) + '\n');
+            // Step 2: Run parallel search
+            const passages = await runSearchFanout(queries);
+            console.log('[Demo 06] Found passages:', passages.length);
+            res.write(JSON.stringify({ type: 'passages', data: passages }) + '\n');
 
-        res.end();
-        console.log('[Demo 06] Completed successfully');
+            // Step 3: Merge results
+            const mergeResult = await mergeResults(question, passages);
+            totalUsage.prompt += mergeResult.usage.prompt;
+            totalUsage.completion += mergeResult.usage.completion;
+            totalUsage.total += mergeResult.usage.total;
+            console.log('[Demo 06] Generated answer:', mergeResult.answer.substring(0, 100) + '...');
+            res.write(JSON.stringify({ type: 'answer', data: mergeResult.answer }) + '\n');
+            
+            // Send token usage (always, even on partial completion)
+            res.write(JSON.stringify({ type: 'usage', data: totalUsage }) + '\n');
+
+            res.end();
+            console.log('[Demo 06] Completed successfully');
+
+        } catch (innerError) {
+            // Send partial token usage if we collected any
+            if (totalUsage.total > 0) {
+                res.write(JSON.stringify({ type: 'usage', data: totalUsage }) + '\n');
+            }
+            // Send error message
+            res.write(JSON.stringify({ 
+                type: 'error', 
+                data: { 
+                    message: innerError instanceof Error ? innerError.message : String(innerError),
+                    hint: 'Azure OpenAI quota exhausted. Your deployment has a tokens-per-minute (TPM) limit. Wait 60+ seconds or request a quota increase in Azure Portal.'
+                } 
+            }) + '\n');
+            res.end();
+            console.error('[Demo 06] Error during processing:', innerError);
+        }
 
     } catch (error) {
         console.error('Agentic search error:', error);
@@ -457,59 +548,18 @@ app.post('/api/multi-agent', async (req, res) => {
             return;
         }
 
-        // Call Demo 07 via child process
-        // __dirname is demos-ui/backend/dist, so we need to go up to workspace root
-        const demo07Path = path.join(__dirname, '../../../demos/07-multi-agent-orchestration');
-
-        // On Windows, npm is a .cmd file, so we need shell or use npm.cmd directly
-        const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-        const child = spawn(npmCmd, ['run', 'dev', '--', question], {
-            cwd: demo07Path,
-            shell: process.platform === 'win32'
+        // Call Demo 07 orchestrator directly (no spawn - much faster!)
+        console.log('[Demo 07] Running multi-agent orchestrator for:', question);
+        
+        const result = await runMultiAgentOrchestrator(question);
+        
+        console.log('[Demo 07] Completed:', {
+            type: result.triage.type,
+            agents: result.agents.join(' → '),
+            ticketId: result.ticketId
         });
 
-        let output = '';
-        let errorOutput = '';
-
-        child.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-
-        child.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-        });
-
-        child.on('close', (code) => {
-            if (code !== 0) {
-                if (!res.headersSent) {
-                    res.status(500).json({
-                        error: 'Multi-agent process failed',
-                        details: errorOutput
-                    });
-                }
-                return;
-            }
-
-            // Parse the output to extract structured data
-            const triageMatch = output.match(/Type: (\w+)/);
-            const reasonMatch = output.match(/Reason: (.+)/);
-            const categoryMatch = output.match(/Category: (\w+)/);
-            const agentsMatch = output.match(/Agents called: (.+)/);
-            const responseMatch = output.match(/Response:\n([\s\S]+)\n━━━━/);
-            const ticketMatch = output.match(/Ticket ID: (TKT-[\w-]+)/);
-
-            res.json({
-                triage: {
-                    type: triageMatch ? triageMatch[1] : 'UNKNOWN',
-                    category: categoryMatch ? categoryMatch[1] : undefined,
-                    reason: reasonMatch ? reasonMatch[1] : ''
-                },
-                agents: agentsMatch ? agentsMatch[1].split(' → ') : [],
-                finalResponse: responseMatch ? responseMatch[1].trim() : output,
-                ticketId: ticketMatch ? ticketMatch[1] : undefined,
-                rawOutput: output
-            });
-        });
+        res.json(result);
 
     } catch (error) {
         console.error('Multi-agent error:', error);
@@ -566,7 +616,7 @@ app.post('/api/streaming-rag', async (req, res) => {
         // Step 2: Stream the answer using Azure OpenAI
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint || !apiKey) {
             throw new Error('Azure OpenAI credentials not configured');
@@ -591,9 +641,8 @@ app.post('/api/streaming-rag', async (req, res) => {
                             content: `Context:\n${context}\n\nQuestion: ${question}`,
                         },
                     ],
-                    temperature: 0.3,
-                    max_tokens: 800,
-                    stream: true, // Enable streaming
+                    max_completion_tokens: 800,
+                    stream: true // Enable streaming
                 }),
             }
         );
@@ -689,8 +738,8 @@ app.post('/api/multimodal-rag', upload.single('image'), async (req, res) => {
         // Call Azure OpenAI with GPT-4 Vision
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        // Try vision-specific deployment first, fallback to main deployment (gpt-4o-mini has vision)
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        // Try vision-specific deployment first, fallback to main deployment (gpt-5-1-chat has vision)
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint || !apiKey) {
             res.status(500).json({ error: 'Azure OpenAI credentials not configured' });
@@ -721,8 +770,7 @@ app.post('/api/multimodal-rag', upload.single('image'), async (req, res) => {
                             ],
                         },
                     ],
-                    max_tokens: 800,
-                    temperature: 0.7,
+                    max_completion_tokens: 800
                 }),
             }
         );

@@ -380,7 +380,7 @@ az functionapp restart --name func-triage-<suffix> --resource-group rg-smart-age
 
 ### Add OpenAI Classification
 
-Replace keyword logic with GPT-4o-mini:
+Replace keyword logic with GPT-5.1-chat:
 
 ```typescript
 import { AzureOpenAI } from "@azure/openai";
@@ -391,7 +391,7 @@ const client = new AzureOpenAI({
 });
 
 const result = await client.chat.completions.create({
-  model: "gpt-4o-mini",
+  model: "gpt-5-1-chat",
   messages: [
     { role: "system", content: "Classify support tickets..." },
     { role: "user", content: ticketText }

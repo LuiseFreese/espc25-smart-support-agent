@@ -48,7 +48,7 @@ Write-Host "║  Azure AI Foundry Smart Support Agent - Full Deployment   ║" -
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
 # Force fresh login to ensure authentication
-Write-Host "[0/9] Ensuring fresh Azure authentication..." -ForegroundColor Cyan
+Write-Host "[0/10] Ensuring fresh Azure authentication..." -ForegroundColor Cyan
 try {
     az logout 2>$null
     Write-Host "  Logged out from previous session" -ForegroundColor Gray
@@ -71,7 +71,7 @@ Write-Host "  Resource Group: $ResourceGroup" -ForegroundColor Gray
 Write-Host "  Support Email: $SupportEmail`n" -ForegroundColor Gray
 
 # Validate prerequisites
-Write-Host "[1/9] Validating prerequisites..." -ForegroundColor Yellow
+Write-Host "[1/10] Validating prerequisites..." -ForegroundColor Yellow
 
 # Check Azure CLI
 try {
@@ -101,7 +101,7 @@ try {
 }
 
 # Set Azure subscription
-Write-Host "`n[2/9] Setting Azure subscription..." -ForegroundColor Yellow
+Write-Host "`n[2/10] Setting Azure subscription..." -ForegroundColor Yellow
 az account set --subscription $SubscriptionId
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Failed to set subscription. Check subscription ID and permissions." -ForegroundColor Red
@@ -392,7 +392,7 @@ AZURE_AI_SEARCH_INDEX=kb-support
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=$openaiEndpoint
 AZURE_OPENAI_API_KEY=$openaiKey
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large
 AZURE_OPENAI_API_VERSION=2024-08-01-preview
 
@@ -417,6 +417,17 @@ AZURE_FUNCTION_APP_URL=http://localhost:7071/api
 Set-Content -Path $envFilePath -Value $envContent -Force
 Write-Host "✓ .env file updated" -ForegroundColor Green
 
+# Get storage account credentials (needed for Demo 07 configuration)
+Write-Host "`n  Getting storage account credentials..." -ForegroundColor Gray
+$storageAccountName = az storage account list --resource-group $ResourceGroup --query "[?contains(name, 'stagents')].name" -o tsv | Select-Object -First 1
+$storageKey = ""
+if ($storageAccountName) {
+    $storageKey = az storage account keys list --account-name $storageAccountName --resource-group $ResourceGroup --query "[0].value" -o tsv
+    Write-Host "  ✓ Storage credentials retrieved: $storageAccountName" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠️  Storage account not found - Demo 07 ticket creation will not work" -ForegroundColor Yellow
+}
+
 # Configure Demo 06 Agentic Retrieval .env
 Write-Host "`n  Configuring Demo 06 Agentic Retrieval..." -ForegroundColor Gray
 $demo06Path = Join-Path $PSScriptRoot "..\demos\06-agentic-retrieval\.env"
@@ -424,7 +435,7 @@ $demo06EnvContent = @"
 # Azure OpenAI Configuration
 AZURE_OPENAI_ENDPOINT=$openaiEndpoint
 AZURE_OPENAI_API_KEY=$openaiKey
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 
 # Azure AI Search Configuration
 AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
@@ -441,7 +452,7 @@ $demo07EnvContent = @"
 # Azure OpenAI Configuration
 AZURE_OPENAI_ENDPOINT=$openaiEndpoint
 AZURE_OPENAI_API_KEY=$openaiKey
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 
 # Azure AI Search Configuration
 AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
@@ -486,6 +497,23 @@ Write-Host "  Found: $funcRag (RAG search)" -ForegroundColor Gray
 # Deploy RAG Function First (Demo 02)
 # ============================================================================
 Write-Host "`n  [6a] Deploying RAG function (Demo 02)..." -ForegroundColor Cyan
+
+# Configure RAG function app settings first
+Write-Host "    Configuring RAG function app settings..." -ForegroundColor Gray
+az functionapp config appsettings set `
+    --name $funcRag `
+    --resource-group $ResourceGroup `
+    --settings `
+        "AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint" `
+        "AZURE_AI_SEARCH_API_KEY=$searchKey" `
+        "AZURE_AI_SEARCH_INDEX=kb-support" `
+        "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
+        "AZURE_OPENAI_API_KEY=$openaiKey" `
+        "AZURE_OPENAI_API_VERSION=2024-08-01-preview" `
+    --output none
+
+Write-Host "  ✓ RAG function app settings configured" -ForegroundColor Green
+
 $demo02RagPath = Join-Path $PSScriptRoot "..\demos\02-rag-search\rag-function"
 
 if (Test-Path $demo02RagPath) {
@@ -521,7 +549,7 @@ az functionapp config appsettings set `
         "AZURE_AI_SEARCH_INDEX=kb-support" `
         "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
         "AZURE_OPENAI_API_KEY=$openaiKey" `
-        "AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini" `
+        "AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5-1-chat" `
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-large" `
         "AZURE_OPENAI_API_VERSION=2024-08-01-preview" `
     --output none
@@ -588,9 +616,10 @@ az functionapp config appsettings set `
         "AZURE_OPENAI_API_KEY=$openaiKey" `
         "SUPPORT_EMAIL_ADDRESS=$SupportEmail" `
         "RAG_ENDPOINT=$ragEndpoint" `
-        "RAG_API_KEY=$ragFunctionKey" `
         "WEBHOOK_URL=$webhookUrl" `
     --output none
+
+Write-Host "    Note: RAG endpoint now uses anonymous authentication (no API key needed)" -ForegroundColor Gray
 
 Write-Host "✓ Both function apps deployed and configured" -ForegroundColor Green
 
@@ -607,7 +636,7 @@ Write-Host "    Creating .env file at: $demo06EnvPath" -ForegroundColor Gray
 # Azure OpenAI Configuration
 AZURE_OPENAI_ENDPOINT=$openaiEndpoint
 AZURE_OPENAI_API_KEY=$openaiKey
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 
 # Azure AI Search Configuration
 AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
@@ -616,6 +645,7 @@ AZURE_AI_SEARCH_INDEX=kb-support
 
 # Demo 02 RAG Function Endpoint (deployed Python function)
 RAG_ENDPOINT=$ragEndpoint
+# Note: RAG_API_KEY kept for backward compatibility, but RAG endpoint now uses anonymous auth
 RAG_API_KEY=$ragFunctionKey
 "@ | Out-File -FilePath $demo06EnvPath -Encoding utf8 -Force
 
@@ -627,7 +657,7 @@ $demosUIBackendEnvPath = Join-Path $PSScriptRoot "..\demos-ui\backend\.env"
 # Azure OpenAI Configuration
 AZURE_OPENAI_ENDPOINT=$openaiEndpoint
 AZURE_OPENAI_API_KEY=$openaiKey
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 
 # Azure AI Search Configuration
 AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint
@@ -646,15 +676,11 @@ Write-Host "✓ Demos UI backend environment configured" -ForegroundColor Green
 # ============================================================================
 Write-Host "`n[6d] Creating SupportTickets table..." -ForegroundColor Cyan
 
-# Get storage account details
-$storageAccountName = az storage account list --resource-group $ResourceGroup --query "[?contains(name, 'stagents')].name" -o tsv | Select-Object -First 1
+# Storage credentials already retrieved earlier (before Demo 07 configuration)
 if (-not $storageAccountName) {
     Write-Host "⚠️  No storage account found" -ForegroundColor Yellow
 } else {
     Write-Host "    Creating table in storage account: $storageAccountName" -ForegroundColor Gray
-
-    # Get storage account key
-    $storageKey = az storage account keys list --account-name $storageAccountName --resource-group $ResourceGroup --query "[0].value" -o tsv
 
     # Create the table using Azure CLI
     az storage table create `
@@ -822,6 +848,51 @@ if (-not $deploymentsReady) {
 
 # Verify Deployment
 Write-Host "`n[9/10] Verifying deployment..." -ForegroundColor Yellow
+
+# Test anonymous endpoints
+Write-Host "  Testing anonymous endpoints..." -ForegroundColor Cyan
+$endpointsOk = $true
+
+# Test triage endpoint
+Write-Host "    Testing /api/triage..." -ForegroundColor Gray
+try {
+    $triageBody = @{ ticket_text = "Test VPN issue" } | ConvertTo-Json
+    $triageResult = Invoke-RestMethod -Method POST -Uri "https://$funcAgents.azurewebsites.net/api/triage" -Body $triageBody -ContentType "application/json" -ErrorAction Stop
+    Write-Host "      ✓ Triage endpoint responding" -ForegroundColor Green
+} catch {
+    Write-Host "      ❌ Triage endpoint failed: $_" -ForegroundColor Red
+    $endpointsOk = $false
+}
+
+# Test ticket endpoint
+Write-Host "    Testing /api/ticket..." -ForegroundColor Gray
+try {
+    $ticketBody = @{ description = "Test ticket"; userEmail = "test@contoso.com" } | ConvertTo-Json
+    $ticketResult = Invoke-RestMethod -Method POST -Uri "https://$funcAgents.azurewebsites.net/api/ticket" -Body $ticketBody -ContentType "application/json" -ErrorAction Stop
+    Write-Host "      ✓ Ticket endpoint responding (ID: $($ticketResult.ticketId))" -ForegroundColor Green
+} catch {
+    Write-Host "      ❌ Ticket endpoint failed: $_" -ForegroundColor Red
+    $endpointsOk = $false
+}
+
+# Test RAG endpoint
+Write-Host "    Testing /api/rag-search..." -ForegroundColor Gray
+try {
+    $ragBody = @{ question = "How do I reset my password?" } | ConvertTo-Json
+    $ragResult = Invoke-RestMethod -Method POST -Uri "https://$funcRag.azurewebsites.net/api/rag-search" -Body $ragBody -ContentType "application/json" -ErrorAction Stop
+    Write-Host "      ✓ RAG endpoint responding (confidence: $($ragResult.confidence))" -ForegroundColor Green
+} catch {
+    Write-Host "      ❌ RAG endpoint failed: $_" -ForegroundColor Red
+    $endpointsOk = $false
+}
+
+if ($endpointsOk) {
+    Write-Host "`n  ✓ All endpoints responding without authentication" -ForegroundColor Green
+} else {
+    Write-Host "`n  ⚠️  Some endpoints failed - check logs above" -ForegroundColor Yellow
+}
+
+# Run full verification script
 $verifyScript = Join-Path $PSScriptRoot "verify-deployment.ps1"
 
 if (Test-Path $verifyScript) {
@@ -923,6 +994,7 @@ if ($graphAppId) {
 
     # Use function app name from earlier deployment (already stored in $funcAgents)
     if ($funcAgents) {
+        # ManageSubscription requires function key authentication (admin operation)
         $functionKey = az functionapp keys list --name $funcAgents --resource-group $ResourceGroup --query "functionKeys.default" -o tsv 2>$null
 
         if ($functionKey) {

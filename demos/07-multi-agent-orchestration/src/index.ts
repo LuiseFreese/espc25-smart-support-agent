@@ -30,6 +30,150 @@ import { runTicket, updateTicketWithAIResponse } from './agents/ticketAgent';
 
 dotenv.config();
 
+/**
+ * Orchestrator result returned to callers
+ */
+export interface OrchestratorResult {
+    triage: {
+        type: string;
+        category?: string;
+        reason: string;
+    };
+    agents: string[];
+    finalResponse: string;
+    ticketId?: string;
+    confidence?: number;
+    usage?: {
+        prompt: number;
+        completion: number;
+        total: number;
+    };
+}
+
+/**
+ * Main orchestrator function - can be called from CLI or imported
+ */
+export async function runMultiAgentOrchestrator(userMessage: string): Promise<OrchestratorResult> {
+    const agentsCalled: string[] = [];
+    let finalResponse = '';
+    let ticketId: string | undefined;
+    let finalConfidence: number | undefined;
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
+    // Step 1: Triage the request
+    const triageResult = await runTriage(userMessage);
+    agentsCalled.push('TriageAgent');
+    
+    // Aggregate triage tokens
+    if (triageResult.meta?.usage) {
+        totalPromptTokens += triageResult.meta.usage.prompt || 0;
+        totalCompletionTokens += triageResult.meta.usage.completion || 0;
+    }
+
+    // Step 2: Route to appropriate agent(s)
+    if (triageResult.type === 'FAQ') {
+        const faqResponse = await runFaq(userMessage);
+        agentsCalled.push('FaqAgent');
+
+        if (faqResponse.confidence && faqResponse.confidence >= 0.8) {
+            finalResponse = faqResponse.text;
+            finalConfidence = faqResponse.confidence;
+        } else {
+            const ragResponse = await runRag(userMessage);
+            agentsCalled.push('RagAgent');
+            finalResponse = ragResponse.text;
+            finalConfidence = ragResponse.confidence;
+            
+            // Aggregate RAG usage
+            if (ragResponse.meta?.usage) {
+                totalPromptTokens += ragResponse.meta.usage.prompt || 0;
+                totalCompletionTokens += ragResponse.meta.usage.completion || 0;
+            }
+        }
+
+    } else if (triageResult.type === 'RAG') {
+        const ragResponse = await runRag(userMessage);
+        agentsCalled.push('RagAgent');
+        finalResponse = ragResponse.text;
+        finalConfidence = ragResponse.confidence;
+        
+        // Aggregate RAG usage
+        if (ragResponse.meta?.usage) {
+            totalPromptTokens += ragResponse.meta.usage.prompt || 0;
+            totalCompletionTokens += ragResponse.meta.usage.completion || 0;
+        }
+
+    } else if (triageResult.type === 'TICKET') {
+        const ticketResponse = await runTicket(userMessage, triageResult.category);
+        agentsCalled.push('TicketAgent');
+        ticketId = ticketResponse.meta?.ticketId as string | undefined;
+
+        // Also provide helpful info from RAG
+        const ragResponse = await runRag(userMessage);
+        agentsCalled.push('RagAgent');
+        
+        // Aggregate RAG usage
+        if (ragResponse.meta?.usage) {
+            totalPromptTokens += ragResponse.meta.usage.prompt || 0;
+            totalCompletionTokens += ragResponse.meta.usage.completion || 0;
+        }
+
+        // Update ticket with AI response and confidence
+        if (ticketId && !ticketResponse.meta?.simulated) {
+            await updateTicketWithAIResponse(
+                ticketId,
+                ragResponse.text,
+                ragResponse.confidence || 0
+            );
+        }
+
+        finalResponse = `${ticketResponse.text}\n\nWhile you wait, here's some information that might help:\n${ragResponse.text}`;
+        finalConfidence = ragResponse.confidence;
+
+    } else {
+        // UNKNOWN
+        const ragResponse = await runRag(userMessage);
+        agentsCalled.push('RagAgent');
+        finalConfidence = ragResponse.confidence;
+        
+        // Aggregate RAG usage
+        if (ragResponse.meta?.usage) {
+            totalPromptTokens += ragResponse.meta.usage.prompt || 0;
+            totalCompletionTokens += ragResponse.meta.usage.completion || 0;
+        }
+
+        if (ragResponse.confidence && ragResponse.confidence < 0.5) {
+            finalResponse = `${ragResponse.text}\n\n⚠️  I'm not confident about this answer. Let me escalate this to a human support agent.`;
+        } else {
+            finalResponse = ragResponse.text;
+        }
+    }
+
+    // Calculate total usage
+    const totalUsage = totalPromptTokens + totalCompletionTokens;
+    
+    return {
+        triage: {
+            type: triageResult.type,
+            category: triageResult.category,
+            reason: triageResult.reason || 'No reason provided'
+        },
+        agents: agentsCalled,
+        finalResponse,
+        ticketId,
+        confidence: finalConfidence,
+        usage: totalUsage > 0 ? {
+            prompt: totalPromptTokens,
+            completion: totalCompletionTokens,
+            total: totalUsage
+        } : undefined
+    };
+}
+
+/**
+ * CLI entry point
+ */
 async function main() {
     // Get user message from command line
     const userMessage = process.argv.slice(2).join(' ');
@@ -45,90 +189,24 @@ async function main() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log(`💬 User: ${userMessage}\n`);
 
-    const agentsCalled: string[] = [];
-    let finalResponse = '';
-
     try {
-        // Step 1: Triage the request
-        console.log('🔍 Step 1: Triaging request...');
-        const triageResult = await runTriage(userMessage);
-        agentsCalled.push('TriageAgent');
-        console.log(`   Type: ${triageResult.type}`);
-        console.log(`   Reason: ${triageResult.reason}`);
-        if (triageResult.category) {
-            console.log(`   Category: ${triageResult.category}`);
-        }
-        console.log();
+        console.log('🔍 Running orchestrator...\n');
+        const result = await runMultiAgentOrchestrator(userMessage);
 
-        // Step 2: Route to appropriate agent(s)
-        if (triageResult.type === 'FAQ') {
-            console.log('📚 Step 2: Checking FAQ...');
-            const faqResponse = await runFaq(userMessage);
-            agentsCalled.push('FaqAgent');
-
-            if (faqResponse.confidence && faqResponse.confidence >= 0.8) {
-                console.log(`   ✅ Found FAQ match (confidence: ${faqResponse.confidence})`);
-                finalResponse = faqResponse.text;
-            } else {
-                console.log('   ⚠️  No FAQ match, falling back to RAG...\n');
-                console.log('🔎 Step 3: Searching knowledge base...');
-                const ragResponse = await runRag(userMessage);
-                agentsCalled.push('RagAgent');
-                console.log(`   Confidence: ${ragResponse.confidence?.toFixed(2)}`);
-                finalResponse = ragResponse.text;
-            }
-
-        } else if (triageResult.type === 'RAG') {
-            console.log('🔎 Step 2: Searching knowledge base...');
-            const ragResponse = await runRag(userMessage);
-            agentsCalled.push('RagAgent');
-            console.log(`   Confidence: ${ragResponse.confidence?.toFixed(2)}`);
-            console.log(`   Passages found: ${ragResponse.meta?.passagesFound || 0}`);
-            finalResponse = ragResponse.text;
-
-        } else if (triageResult.type === 'TICKET') {
-            console.log('🎫 Step 2: Creating support ticket...');
-            const ticketResponse = await runTicket(userMessage, triageResult.category);
-            agentsCalled.push('TicketAgent');
-            console.log(`   Ticket ID: ${ticketResponse.meta?.ticketId}`);
-
-            // Also provide helpful info from RAG if available
-            console.log('\n🔎 Step 3: Searching for related information...');
-            const ragResponse = await runRag(userMessage);
-            agentsCalled.push('RagAgent');
-
-            // Update ticket with AI response and confidence
-            if (ticketResponse.meta?.ticketId && !ticketResponse.meta?.simulated) {
-                await updateTicketWithAIResponse(
-                    String(ticketResponse.meta.ticketId),
-                    ragResponse.text,
-                    ragResponse.confidence || 0
-                );
-            }
-
-            finalResponse = `${ticketResponse.text}\n\nWhile you wait, here's some information that might help:\n${ragResponse.text}`;
-
-        } else {
-            // UNKNOWN
-            console.log('❓ Step 2: Unknown request type, trying RAG...');
-            const ragResponse = await runRag(userMessage);
-            agentsCalled.push('RagAgent');
-            console.log(`   Confidence: ${ragResponse.confidence?.toFixed(2)}`);
-
-            if (ragResponse.confidence && ragResponse.confidence < 0.5) {
-                finalResponse = `${ragResponse.text}\n\n⚠️  I'm not confident about this answer. Let me escalate this to a human support agent.`;
-            } else {
-                finalResponse = ragResponse.text;
-            }
-        }
-
-        // Step 3: Display results
-        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        // Display detailed console output for CLI
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📊 Summary');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-        console.log(`Agents called: ${agentsCalled.join(' → ')}\n`);
-        console.log('🤖 Response:');
-        console.log(finalResponse);
+        console.log(`Type: ${result.triage.type}`);
+        console.log(`Reason: ${result.triage.reason}`);
+        if (result.triage.category) {
+            console.log(`Category: ${result.triage.category}`);
+        }
+        console.log(`Agents called: ${result.agents.join(' → ')}`);
+        if (result.ticketId) {
+            console.log(`Ticket ID: ${result.ticketId}`);
+        }
+        console.log(`\n🤖 Response:\n${result.finalResponse}`);
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     } catch (error) {
@@ -138,4 +216,7 @@ async function main() {
     }
 }
 
-main();
+// Only run main() if this file is executed directly (not imported)
+if (require.main === module) {
+    main();
+}

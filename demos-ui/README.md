@@ -49,7 +49,7 @@ Copy `.env.example` to `.env` and fill in your Azure credentials:
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-key
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 AZURE_OPENAI_DEPLOYMENT_VISION=gpt-4o
 
 # Azure AI Search
@@ -80,13 +80,13 @@ Open http://localhost:5173 in your browser.
 
 ## Available Demos
 
-| Demo | Endpoint | Description |
-|------|----------|-------------|
-| Demo 01 | `POST /api/triage` | Keyword-based triage classification |
-| Demo 02 | `POST /api/simple-rag` | Basic RAG search with **optional image upload** (GPT-4 Vision) + streaming |
-| Demo 03 | `POST /api/agent-tools` | Function calling patterns |
-| Demo 06 | `POST /api/agentic-search` | Query planning + parallel search |
-| Demo 07 | `POST /api/multi-agent` | Multi-agent orchestration |
+| Demo    | Endpoint                   | Description                                                                |
+| ------- | -------------------------- | -------------------------------------------------------------------------- |
+| Demo 01 | `POST /api/triage`         | Keyword-based triage classification                                        |
+| Demo 02 | `POST /api/simple-rag`     | Basic RAG search with **optional image upload** (GPT-4 Vision) + streaming |
+| Demo 03 | `POST /api/agent-tools`    | Function calling patterns                                                  |
+| Demo 06 | `POST /api/agentic-search` | Query planning + parallel search                                           |
+| Demo 07 | `POST /api/multi-agent`    | Multi-agent orchestration                                                  |
 
 **Note:** Demo 02 supports optional image upload for multi-modal RAG. Upload a screenshot, diagram, or photo to get GPT-4 Vision analysis combined with knowledge base search.
 
@@ -140,48 +140,3 @@ npm run preview
 - Frontend calls backend API endpoints
 - Backend orchestrates Azure OpenAI, AI Search, RAG functions
 - Responses formatted for UI display
-
-## Key Features
-
-### Demo 02: Streaming RAG
-- Toggle between streaming and non-streaming responses
-- Server-Sent Events (SSE) for real-time token delivery
-- Confidence scoring and passage display
-
-### Demo 02: Multi-Modal RAG
-- Drag-and-drop image upload
-- GPT-4 Vision analysis
-- Knowledge base citations with [1], [2] markers
-- Clickable citations to full passages
-
-## Troubleshooting
-
-**Port conflicts:**
-```powershell
-# Kill processes on port 3000 or 5173
-Get-NetTCPConnection -LocalPort 3000 | Select-Object -ExpandProperty OwningProcess | Stop-Process -Force
-```
-
-**Environment variables not loaded:**
-- Ensure `.env` file exists in `demos-ui/` directory
-- Restart backend server after changing `.env`
-
-**CORS errors:**
-- Backend must be running on port 3000
-- Frontend must be running on port 5173
-- Check CORS configuration in `server-unified.ts`
-
-## Migration Notes
-
-This unified UI replaces the previous structure where each demo had its own UI. Benefits:
-
-- ✅ Single codebase for all demos
-- ✅ Consistent UI/UX across demos
-- ✅ Shared components and styling
-- ✅ Easier maintenance and updates
-- ✅ Better development workflow
-
-**Old structure:** `demos/06-agentic-retrieval/` (contained unified UI)  
-**New structure:** `demos-ui/` (dedicated unified UI folder)
-
-Individual demo folders (01-08) now focus on their core logic without UI concerns.

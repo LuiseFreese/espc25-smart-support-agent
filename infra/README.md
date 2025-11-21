@@ -43,7 +43,7 @@ graph TB
 
 | Resource | Type | SKU | Purpose |
 |----------|------|-----|---------|
-| `oai-agents-*` | Azure OpenAI Service | S0 | GPT-4o-mini, text-embedding-3-large deployments |
+| `oai-agents-*` | Azure OpenAI Service | S0 | GPT-5.1-chat, text-embedding-3-large deployments |
 | `srch-agents-*` | Azure AI Search | Standard S1 | Knowledge base indexing with vector search |
 | `func-agents-*` | Function App (Node.js 20) | Consumption | Email processing, triage, ticket creation |
 | `func-rag-*` | Function App (Python 3.11) | Consumption | RAG search with AI Search integration |
@@ -55,7 +55,7 @@ graph TB
 | `log-agents-*` | Log Analytics | Pay-as-you-go | Centralized logging |
 | `plan-agents-*` | App Service Plan | B1 (Linux) | Hosting for function apps |
 
-**Region**: Sweden Central (GPT-4o-mini availability)
+**Region**: Sweden Central (GPT-5.1-chat availability)
 
 ## Architecture
 

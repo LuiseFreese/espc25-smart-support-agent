@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Triage API",
+    "description": "Classify support requests into category and priority",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://func-agents-7egpzzovabxku.azurewebsites.net",
+      "description": "Azure Function App endpoint (replace {uniqueid} with your actual function app ID)"
+    }
+  ],
+  "paths": {
+    "/api/triage": {
+      "post": {
+        "operationId": "classifyTicket",
+        "summary": "Classify a support ticket by category and priority",
+        "description": "Analyzes the ticket text and returns category (Access, Network, Billing, Software, Other) and priority (High, Medium, Low)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ticket_text"
+                ],
+                "properties": {
+                  "ticket_text": {
+                    "type": "string",
+                    "description": "The email or message text to classify",
+                    "example": "My VPN keeps disconnecting every 5 minutes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful classification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "Access",
+                        "Network",
+                        "Billing",
+                        "Software",
+                        "Other"
+                      ],
+                      "description": "The classified category"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "High",
+                        "Medium",
+                        "Low"
+                      ],
+                      "description": "The assigned priority level"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "Confidence score of the classification"
+                    }
+                  }
+                },
+                "example": {
+                  "category": "Network",
+                  "priority": "Medium",
+                  "confidence": 0.95
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "functionKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-functions-key"
+      }
+    }
+  }
+}

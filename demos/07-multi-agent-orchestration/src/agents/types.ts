@@ -15,10 +15,25 @@ export interface TriageResult {
     type: TriageType;
     reason?: string;
     category?: string;
+    meta?: {
+        usage?: {
+            prompt: number;
+            completion: number;
+            total: number;
+        };
+        [key: string]: unknown;
+    };
 }
 
 export interface AgentResponse {
     text: string;
     confidence?: number;
-    meta?: Record<string, unknown>;
+    meta?: {
+        usage?: {
+            prompt: number;
+            completion: number;
+            total: number;
+        };
+        [key: string]: unknown;
+    };
 }

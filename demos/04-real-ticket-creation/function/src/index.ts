@@ -4,6 +4,7 @@ import { GraphWebhook } from './functions/GraphWebhook';
 import { ManageSubscription } from './functions/ManageSubscription';
 import { triage } from './functions/triage';
 import { answer } from './functions/answer';
+import { createTicket } from './functions/CreateTicket';
 // DISABLED: Timer trigger causes infinite loop - replies create new emails
 // import { CheckMailboxTimer } from './functions/CheckMailboxTimer';
 import './functions/PingStorage';  // Auto-registers via app.http()
@@ -30,14 +31,20 @@ app.http('ProcessSupportEmail', {
 // Demo 05: Copilot Studio Plugin endpoints
 app.http('triage', {
   methods: ['POST'],
-  authLevel: 'function',  // Requires function key for API access
+  authLevel: 'anonymous',  // Allow anonymous access for Foundry agent
   handler: triage
 });
 
 app.http('answer', {
   methods: ['POST'],
-  authLevel: 'function',
+  authLevel: 'anonymous',  // Allow anonymous access for Foundry agent
   handler: answer
+});
+
+app.http('ticket', {
+  methods: ['POST'],
+  authLevel: 'anonymous',  // Allow anonymous access for Foundry agent
+  handler: createTicket
 });
 
 // DISABLED: Use Graph webhook subscription instead of polling timer

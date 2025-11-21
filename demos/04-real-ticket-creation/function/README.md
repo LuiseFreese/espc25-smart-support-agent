@@ -221,7 +221,7 @@ const response = await fetch(process.env.RAG_ENDPOINT, {
 3. Hybrid search in Azure AI Search (vector + keyword + semantic)
 4. Scores results using semantic reranker (0-4)
 5. Maps score to confidence (0.1-0.9)
-6. Generates answer via GPT-4o-mini with top retrieved passages as context
+6. Generates answer via GPT-5.1-chat with top retrieved passages as context
 7. Returns: `{answer: "...", confidence: 0.85, sources: [...]}`
 
 **Confidence Thresholds:**

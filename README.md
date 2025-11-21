@@ -45,7 +45,7 @@ graph TB
 
 **Key Technologies:**
 - **Email:** Graph API (read) + Azure Communication Services (send)
-- **AI:** Azure OpenAI (GPT-4o-mini, text-embedding-3-large)
+- **AI:** Azure OpenAI (GPT-5.1-chat, text-embedding-3-large)
 - **Search:** Azure AI Search with semantic ranking
 - **Storage:** Table Storage with EmailMessageId deduplication
 - **Infrastructure:** Bicep templates, Azure Functions (Node.js + Python)
@@ -131,7 +131,7 @@ az deployment sub create \
 
 **What gets deployed:**
 - Azure AI Foundry (AI Hub + Project)
-- Azure OpenAI (gpt-4o-mini, text-embedding-3-large)
+- Azure OpenAI (gpt-5.1-chat, text-embedding-3-large)
 - Azure AI Search (Standard tier)
 - Azure Functions (Node.js 20 + Python 3.11)
 - Azure Communication Services (email sending)

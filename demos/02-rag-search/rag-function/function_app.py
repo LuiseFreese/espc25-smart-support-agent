@@ -63,7 +63,7 @@ search_client = SearchClient(
     AzureKeyCredential(search_key)
 )
 
-@app.route(route="rag-search", auth_level=func.AuthLevel.FUNCTION)
+@app.route(route="rag-search", auth_level=func.AuthLevel.ANONYMOUS)
 def rag_search(req: func.HttpRequest) -> func.HttpResponse:
     """RAG Search endpoint"""
     logging.info('Python HTTP trigger function processed a request.')
@@ -168,7 +168,7 @@ def rag_search(req: func.HttpRequest) -> func.HttpResponse:
         ])
 
         # Generate answer using GPT
-        chat_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o-mini")
+        chat_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5-1-chat")
         chat_response = openai_client.chat.completions.create(
             model=chat_deployment,
             messages=[
@@ -186,8 +186,7 @@ Answer concisely based on the context above. If the context doesn't contain the 
                     "content": question
                 }
             ],
-            temperature=0.3,
-            max_tokens=500
+            max_completion_tokens=500
         )
 
         answer = chat_response.choices[0].message.content

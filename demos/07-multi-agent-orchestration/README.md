@@ -34,7 +34,7 @@ FaqAgent  RagAgent   TicketAgent  RagAgent
 ## Prerequisites
 
 Same infrastructure as demos 02-06:
-- Azure OpenAI (GPT-4o-mini deployment)
+- Azure OpenAI (GPT-5.1-chat deployment)
 - Azure AI Search (kb-support index)
 - Azure Table Storage (SupportTickets table)
 
@@ -53,7 +53,7 @@ Same infrastructure as demos 02-06:
    # .env should contain:
    AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
    AZURE_OPENAI_API_KEY=your-key-here
-   AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+   AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
    AZURE_AI_SEARCH_ENDPOINT=https://your-search.search.windows.net
    AZURE_AI_SEARCH_API_KEY=your-search-key
    AZURE_AI_SEARCH_INDEX=kb-support

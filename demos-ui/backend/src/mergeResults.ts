@@ -23,10 +23,47 @@ function getClient() {
     });
 }
 
-export async function mergeResults(question: string, hits: SearchHit[]): Promise<string> {
+// Retry wrapper with exponential backoff for rate limit errors
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>, 
+    maxRetries = 2, 
+    initialDelay = 10000 // Start with 10 seconds - Azure OpenAI rate limits need recovery time
+): Promise<T> {
+    let lastError: any;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Check if it's a rate limit error (429)
+            if (error?.status === 429 || error?.code === 'rate_limit_exceeded') {
+                if (i < maxRetries - 1) { // Only retry if not last attempt
+                    const delay = initialDelay * Math.pow(2, i); // 10s → 20s
+                    console.log(`⏳ Azure OpenAI rate limited, waiting ${delay/1000}s before retry (attempt ${i + 1}/${maxRetries})...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.log(`❌ Rate limit persists after ${maxRetries} attempts - Azure quota likely exhausted`);
+                    throw error;
+                }
+            } else {
+                // Not a rate limit error, don't retry
+                throw error;
+            }
+        }
+    }
+    
+    throw lastError;
+}
+
+export async function mergeResults(question: string, hits: SearchHit[]): Promise<{ answer: string, usage: { prompt: number, completion: number, total: number } }> {
     const client = getClient();
     if (hits.length === 0) {
-        return "I couldn't find any relevant information in the knowledge base to answer your question.";
+        return { 
+            answer: "I couldn't find any relevant information in the knowledge base to answer your question.",
+            usage: { prompt: 0, completion: 0, total: 0 }
+        };
     }
 
     // Build numbered passage list
@@ -55,15 +92,27 @@ ${passageList}
 
 Answer the question using only these passages. Include citations.`;
 
-    const response = await client.chat.completions.create({
-        model: process.env.AZURE_OPENAI_DEPLOYMENT!,
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 500
-    });
+    const response = await retryWithBackoff(() =>
+        client.chat.completions.create({
+            model: process.env.AZURE_OPENAI_DEPLOYMENT!,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            max_completion_tokens: 500
+        })
+    );
 
-    return response.choices[0]?.message?.content || 'Unable to generate answer.';
+    // Capture token usage
+    const usage = {
+        prompt: response.usage?.prompt_tokens || 0,
+        completion: response.usage?.completion_tokens || 0,
+        total: response.usage?.total_tokens || 0
+    };
+
+    // Log token usage
+    console.log(`📊 Result Merging tokens: prompt=${usage.prompt}, completion=${usage.completion}, total=${usage.total}`);
+
+    const answer = response.choices[0]?.message?.content || 'No answer generated.';
+    return { answer, usage };
 }

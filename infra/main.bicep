@@ -191,7 +191,7 @@ module openAI 'modules/openai.bicep' = {
   params: {
     name: openAIName
     location: location
-    gptDeploymentName: 'gpt-4o-mini'
+    gptDeploymentName: 'gpt-5-1-chat'
     embeddingDeploymentName: 'text-embedding-3-large'
   }
 }

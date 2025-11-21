@@ -34,13 +34,13 @@ This demo shows how Azure OpenAI *could* classify support tickets using prompt e
 
 ### Azure OpenAI Service
 
-**Model:** `gpt-4o-mini` (already deployed for Demo 02 RAG)
+**Model:** `gpt-5.1-chat` (already deployed for Demo 02 RAG)
 **System Prompt:** See `prompts/system.jinja2`
 **Output Format:** JSON with category and priority
 
 **Flow:**
 ```
-User ticket → System prompt + ticket text → GPT-4o-mini → JSON response
+User ticket → System prompt + ticket text → GPT-5.1-chat → JSON response
 ```
 
 **Example:**
@@ -81,7 +81,7 @@ pf flow test -f flow.dag.yaml \
 **Per Ticket Classification:**
 - Input tokens: ~150 (system prompt + ticket text)
 - Output tokens: ~50 (JSON response)
-- Cost: ~$0.0001 per classification (gpt-4o-mini pricing)
+- Cost: ~$0.0004 per classification (gpt-5.1-chat pricing)
 
 **Monthly Volume (10,000 tickets):**
 - Total cost: ~$1.00/month
@@ -92,7 +92,7 @@ pf flow test -f flow.dag.yaml \
 
 **In Azure AI Foundry Playground:**
 1. Navigate to Chat Playground
-2. Select `gpt-4o-mini` deployment
+2. Select `gpt-5.1-chat` deployment
 3. Copy system prompt from `prompts/classify.jinja2`
 4. Test with: "VPN disconnects every 5 minutes"
 5. Model returns: `{"category": "Network", "priority": "Medium"}`
@@ -164,7 +164,7 @@ These test results show the AI approach WAS working, we just chose not to deploy
 
 ### Classification Testing
 
-Tested LLM-based classification with 5 diverse support scenarios using Azure OpenAI (`gpt-4o-mini`).
+Tested LLM-based classification with 5 diverse support scenarios using Azure OpenAI (`gpt-5.1-chat`).
 
 #### Test Results
 
@@ -217,7 +217,7 @@ python tests/test-demo01-triage.py
 **Current State**: Demo 01 classification logic is **FULLY FUNCTIONAL** but **not deployed as Prompt Flow**.
 
 **Verified Components**:
-- Azure OpenAI model (`gpt-4o-mini`) working
+- Azure OpenAI model (`gpt-5.1-chat`) working
 - System prompt with clear classification rules
 - JSON structured output
 - High classification accuracy (100% category, 80% priority)

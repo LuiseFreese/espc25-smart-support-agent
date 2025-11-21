@@ -10,7 +10,7 @@ All demos share the following production resources in resource group `rg-smart-a
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| Azure OpenAI | `oai-agents-dw7z4hg4ssn2k` | GPT-4o-mini & text-embedding-3-large models |
+| Azure OpenAI | `oai-agents-dw7z4hg4ssn2k` | GPT-5.1-chat & text-embedding-3-large models |
 | Azure AI Search | `srch-agents-dw7z4hg4ssn2k` | Knowledge base index with vector embeddings |
 | Storage Account | `stagentsdw7z4hg4ssn2k` | Table Storage for tickets, blob for KB files |
 | Communication Services | `commserv-agents-dw7z4hg4ssn2k` | Email sending (auto-replies) |
@@ -37,7 +37,7 @@ All demos share the following production resources in resource group `rg-smart-a
 
 | Resource | Potential Usage |
 |----------|-------|
-| **Azure OpenAI** (`gpt-4o-mini`) | LLM for ticket classification via structured prompts |
+| **Azure OpenAI** (`gpt-5.1-chat`) | LLM for ticket classification via structured prompts |
 | **AI Project** | Prompt Flow runtime (not deployed) |
 | **Application Insights** | Track classification accuracy (not deployed) |
 
@@ -92,7 +92,7 @@ Demonstrate **Retrieval Augmented Generation (RAG)** for grounding AI responses 
 |----------|-------|
 | **Azure AI Search** (`kb-support` index) | Vector + semantic search for knowledge retrieval |
 | **Azure OpenAI** (`text-embedding-3-large`) | Convert text to 3072-dimensional embeddings |
-| **Azure OpenAI** (`gpt-4o-mini`) | Generate answers from retrieved context |
+| **Azure OpenAI** (`gpt-5.1-chat`) | Generate answers from retrieved context |
 | **Function App** (`func-rag-dw7z4hg4ssn2k`) | Python RAG search API endpoint |
 | **Storage Account** | Store original KB markdown files |
 
@@ -144,7 +144,7 @@ Demonstrate **AI agent with function calling** capabilities. Shows how LLMs can 
 
 | Resource | Usage |
 |----------|-------|
-| **Azure OpenAI** (`gpt-4o-mini`) | Agent reasoning and function calling |
+| **Azure OpenAI** (`gpt-5.1-chat`) | Agent reasoning and function calling |
 | **Function App** (`func-agents-dw7z4hg4ssn2k`) | Tool endpoints (CreateTicket, GetOrderStatus) |
 | **Table Storage** | Persist tickets and order data |
 
@@ -209,7 +209,7 @@ Demonstrate **event-driven production system** for automated email support using
 | **Function App** (`func-agents-dw7z4hg4ssn2k`) | Email processing, webhooks, triage, ticket creation |
 | **Microsoft Graph API** | Email monitoring (reading emails only) |
 | **Azure Communication Services** (`commserv-agents-*`) | Auto-reply email sending |
-| **Azure OpenAI** (`gpt-4o-mini`) | Keyword-based triage classification |
+| **Azure OpenAI** (`gpt-5.1-chat`) | Keyword-based triage classification |
 | **RAG Function** (`func-rag-dw7z4hg4ssn2k`) | Knowledge base search |
 | **Table Storage** (`SupportTickets` table) | Ticket persistence with deduplication |
 | **Application Insights** | Real-time monitoring and logging |
@@ -290,7 +290,7 @@ Demonstrate **Copilot Studio extensibility** by exposing the triage classificati
 | **Function App** (`func-triage-7egpzzovabxku`) | REST API endpoint for triage classification |
 | **OpenAPI Specification** (`triage-api.yaml`) | API contract for Copilot Studio |
 | **API Key Authentication** | Function key-based security |
-| **Azure OpenAI** (`gpt-4o-mini`) | Keyword-based triage logic (same as Demo 04) |
+| **Azure OpenAI** (`gpt-5.1-chat`) | Keyword-based triage logic (same as Demo 04) |
 
 ### Key Features
 - **OpenAPI Integration**: Standards-based REST API definition

@@ -19,7 +19,7 @@ This approach improves retrieval quality by:
 
 ## Prerequisites
 
-- Azure OpenAI resource with GPT-4o-mini deployed
+- Azure OpenAI resource with GPT-5.1-chat deployed
 - Azure AI Search resource with `kb-support` index (from Demo 02)
 - Node.js 20+
 

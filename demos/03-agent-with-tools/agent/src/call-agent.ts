@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT!;
 const OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY;
-const OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+const OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 const OPENAI_API_VERSION = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview';
 const FUNCTION_BASE_URL = process.env.AZURE_FUNCTION_APP_URL || 'https://func-agents-dw7z4hg4ssn2k.azurewebsites.net/api';
 const USE_MANAGED_IDENTITY = process.env.USE_MANAGED_IDENTITY === 'true';
@@ -124,9 +124,13 @@ async function callOpenAI(messages: Message[], toolChoice: any = 'auto'): Promis
     messages: messages as any,
     tools: tools as any,
     tool_choice: toolChoice,
-    temperature: 0.7,
-    max_tokens: 800,
+    max_completion_tokens: 800
   });
+
+  // Log token usage
+  if (response.usage) {
+    console.log(`📊 Demo 03 Agent tokens: prompt=${response.usage.prompt_tokens}, completion=${response.usage.completion_tokens}, total=${response.usage.total_tokens}`);
+  }
 
   return response;
 }
@@ -245,6 +249,18 @@ Be concise and professional in your responses.`,
       });
 
       console.log('✅ Assistant:', assistantMessage.content);
+      
+      // Output JSON for backend parsing (usage will be displayed in UI)
+      const result = {
+        response: assistantMessage.content,
+        usage: {
+          prompt: totalInputTokens,
+          completion: totalOutputTokens,
+          total: totalInputTokens + totalOutputTokens
+        }
+      };
+      console.log('\n[JSON_OUTPUT]' + JSON.stringify(result) + '[/JSON_OUTPUT]');
+      
       return assistantMessage.content;
     }
 

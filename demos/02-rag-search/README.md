@@ -15,7 +15,7 @@ This demo shows Retrieval Augmented Generation (RAG) using Azure AI Search for s
 
 ### 1. Standard RAG (Text-Only)
 - Enter question → Search knowledge base → Get answer
-- Uses hybrid search + GPT-4o-mini for answer generation
+- Uses hybrid search + GPT-5.1-chat for answer generation
 - Returns passages with confidence score
 
 ### 2. Streaming RAG (Real-Time Response)
@@ -135,7 +135,7 @@ Input:  "How do I reset my password?"
 Output: [0.023, -0.157, 0.089, ..., 0.234] (3072 numbers)
 ```
 
-**2. Chat Model: `gpt-4o-mini`**
+**2. Chat Model: `gpt-5.1-chat`**
 
 **Purpose:** Generates natural language answers from retrieved context
 
@@ -154,7 +154,7 @@ Include citations [1], [2] for each fact.
 
 **Cost:** ~$0.0002 per query (context + answer generation)
 
-**3. 🆕 Vision Model: `gpt-4o` or `gpt-4o-mini` (with vision)**
+**3. 🆕 Vision Model: `gpt-5.1-chat` (with vision)**
 
 **Purpose:** Analyze uploaded images before RAG search
 
@@ -244,10 +244,10 @@ flowchart TD
     E2 --> F
     E3 --> F
     
-    F --> G[6. Synthesize Answer<br/>GPT-4o-mini]
+    F --> G[6. Synthesize Answer<br/>GPT-5.1-chat]
     G --> H[Final Response:<br/>Visual Analysis +<br/>KB Troubleshooting<br/>Confidence: 0.95]
 ```
-    D1 --> E[4. Generate Answer<br/>Azure OpenAI: gpt-4o-mini]
+    D1 --> E[4. Generate Answer<br/>Azure OpenAI: gpt-5.1-chat]
     D2 --> E
     D3 --> E
     
@@ -407,13 +407,13 @@ Expected output:
 
 ### How RAG Improves Accuracy
 
-**Without RAG (GPT-4o-mini alone):**
+**Without RAG (GPT-5.1-chat alone):**
 - May hallucinate URLs or procedures
 - No source citations
 -  Cannot access company-specific processes
 - **Accuracy**: ~60% for internal questions
 
-**With RAG (Azure AI Search + GPT-4o-mini):**
+**With RAG (Azure AI Search + GPT-5.1-chat):**
 - Grounded in actual knowledge base
 - Source citations for verification
 - Always up-to-date with KB
@@ -424,7 +424,7 @@ Expected output:
 **Per Query (RAG Pipeline):**
 1. Embed question: ~$0.000013 (text-embedding-3-large, ~100 tokens)
 2. Search query: ~$0.0001 (Azure AI Search query cost)
-3. Generate answer: ~$0.0002 (gpt-4o-mini, ~1500 tokens)
+3. Generate answer: ~$0.0008 (gpt-5.1-chat, ~1500 tokens)
 **Total: ~$0.0003 per query**
 
 **Monthly Volume (10,000 queries):**
@@ -447,7 +447,7 @@ AZURE_AI_SEARCH_API_KEY=<your-key>
 AZURE_AI_SEARCH_INDEX=kb-support
 AZURE_OPENAI_ENDPOINT=https://<your-openai>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<your-key>
-AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat
 ```
 
 ### Run RAG Flow
@@ -586,7 +586,7 @@ az functionapp keys list --name func-rag-dw7z4hg4ssn2k --resource-group rg-smart
 - Azure AI Search index (`kb-support`) with 10 embedded documents
 - RAG function deployed and responding
 - Text embedding model (`text-embedding-3-large`) working
-- Chat model (`gpt-4o-mini`) generating answers
+- Chat model (`gpt-5.1-chat`) generating answers
 - Semantic ranking returning relevant results
 
 **Integration:**

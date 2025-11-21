@@ -705,7 +705,7 @@
             "value": "[parameters('location')]"
           },
           "gptDeploymentName": {
-            "value": "gpt-4o-mini"
+            "value": "gpt-5-1-chat"
           },
           "embeddingDeploymentName": {
             "value": "text-embedding-3-large"
@@ -743,14 +743,14 @@
             },
             "gptDeploymentName": {
               "type": "string",
-              "defaultValue": "gpt-4o-mini",
+              "defaultValue": "gpt-5-1-chat",
               "metadata": {
                 "description": "GPT deployment name"
               }
             },
             "gptModelName": {
               "type": "string",
-              "defaultValue": "gpt-4o-mini",
+              "defaultValue": "gpt-5.1-chat",
               "metadata": {
                 "description": "GPT model name"
               }

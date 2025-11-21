@@ -1,0 +1,143 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Ticket Creation API",
+    "description": "Create support tickets in the system",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://func-agents-7egpzzovabxku.azurewebsites.net",
+      "description": "Azure Function App endpoint (replace {uniqueid} with your actual function app ID)"
+    }
+  ],
+  "paths": {
+    "/api/ticket": {
+      "post": {
+        "operationId": "createTicket",
+        "summary": "Create a new support ticket",
+        "description": "Creates a ticket in Azure Table Storage and returns the ticket ID",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "description",
+                  "userEmail"
+                ],
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "description": "Description of the issue or request",
+                    "example": "VPN disconnects every 5 minutes, unable to work from home"
+                  },
+                  "userEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the user reporting the issue",
+                    "example": "user@contoso.com"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "Access",
+                      "Network",
+                      "Billing",
+                      "Software",
+                      "Other"
+                    ],
+                    "description": "Issue category (optional, will be auto-classified if not provided)"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "High",
+                      "Medium",
+                      "Low"
+                    ],
+                    "description": "Priority level (optional, will be auto-assigned if not provided)"
+                  },
+                  "aiResponse": {
+                    "type": "string",
+                    "description": "AI-generated response or solution (optional)"
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Confidence score of the AI response (0.0-1.0, optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticketId": {
+                      "type": "string",
+                      "description": "Unique ticket identifier",
+                      "example": "TKT-20251120-A1B2C3"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current ticket status",
+                      "example": "Open"
+                    },
+                    "category": {
+                      "type": "string",
+                      "description": "Assigned category"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "description": "Assigned priority"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Timestamp of ticket creation"
+                    }
+                  }
+                },
+                "example": {
+                  "ticketId": "TKT-20251120-A1B2C3",
+                  "status": "Open",
+                  "category": "Network",
+                  "priority": "Medium",
+                  "createdAt": "2025-11-20T10:30:00Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "functionKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-functions-key"
+      }
+    }
+  }
+}

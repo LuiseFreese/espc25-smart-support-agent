@@ -24,7 +24,7 @@ graph TB
     end
 
     subgraph AIServices["AI Services"]
-        OpenAI["Azure OpenAI<br/>oai-agents-m4ia3p7llrr4u<br/>• gpt-4o-mini<br/>• text-embedding-3-large"]
+        OpenAI["Azure OpenAI<br/>oai-agents-m4ia3p7llrr4u<br/>• gpt-5.1-chat<br/>• text-embedding-3-large"]
         Search["Azure AI Search<br/>srch-agents-m4ia3p7llrr4u<br/>• 11 KB documents<br/>• Semantic ranking<br/>• Hybrid search"]
     end
 
@@ -269,7 +269,7 @@ graph TD
 | 3 | func-rag-m4ia3p7llrr4u | Function App (Python) | Sweden Central | RAG search endpoint |
 | 4 | stagentsm4ia3p7llrr4u | Storage Account | Sweden Central | SupportTickets table, function storage |
 | 5 | comm-agents-m4ia3p7llrr4u | Communication Services | Global | Email sending (auto-replies) |
-| 6 | oai-agents-m4ia3p7llrr4u | Azure OpenAI | Sweden Central | GPT-4o-mini + embeddings |
+| 6 | oai-agents-m4ia3p7llrr4u | Azure OpenAI | Sweden Central | GPT-5.1-chat + embeddings |
 | 7 | srch-agents-m4ia3p7llrr4u | AI Search | Sweden Central | Knowledge base (11 docs) |
 | 8 | plan-agents-m4ia3p7llrr4u | App Service Plan | Sweden Central | Hosts both function apps |
 | 9 | log-smart-agents-m4ia3p7llrr4u | Log Analytics | Sweden Central | Centralized log storage |

@@ -106,7 +106,7 @@ app.post('/api/triage', async (req, res) => {
 
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint) {
             throw new Error('AZURE_OPENAI_ENDPOINT not configured');
@@ -147,8 +147,7 @@ Respond ONLY with valid JSON in this exact format:
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: ticketText }
                 ],
-                temperature: 0.3,
-                max_tokens: 200
+                max_completion_tokens: 200
             })
         });
 
@@ -468,7 +467,7 @@ app.post('/api/streaming-rag', async (req, res) => {
         // Step 2: Stream the answer using Azure OpenAI
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint || !apiKey) {
             throw new Error('Azure OpenAI credentials not configured');
@@ -587,8 +586,8 @@ app.post('/api/multimodal-rag', upload.single('image'), async (req, res) => {
         // Call Azure OpenAI with GPT-4 Vision
         const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
         const apiKey = process.env.AZURE_OPENAI_API_KEY;
-        // Try vision-specific deployment first, fallback to main deployment (gpt-4o-mini has vision)
-        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+        // Try vision-specific deployment first, fallback to main deployment (gpt-5-1-chat has vision)
+        const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_VISION || process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-1-chat';
 
         if (!endpoint || !apiKey) {
             res.status(500).json({ error: 'Azure OpenAI credentials not configured' });
@@ -617,15 +616,12 @@ app.post('/api/multimodal-rag', upload.single('image'), async (req, res) => {
                                 { type: 'text', text: question },
                                 { type: 'image_url', image_url: { url: imageUrl } },
                             ],
-                        },
-                    ],
-                    max_tokens: 800,
-                    temperature: 0.7,
-                }),
-            }
-        );
-
-        if (!visionResponse.ok) {
+                    },
+                ],
+                max_completion_tokens: 800
+            }),
+        }
+    );        if (!visionResponse.ok) {
             const errorText = await visionResponse.text();
             console.error('Vision API error:', errorText);
             res.status(500).json({

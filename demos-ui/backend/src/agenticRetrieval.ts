@@ -64,7 +64,8 @@ async function main() {
     // Step 1: Query Planning
     console.log(`📝 User question: "${question}"\n`);
     console.log('🤔 Planning sub-queries...');
-    const subQueries = await planQueries(question);
+    const planResult = await planQueries(question);
+    const subQueries = planResult.queries;
     console.log(`✓ Generated ${subQueries.length} sub-queries:\n`);
     subQueries.forEach((q, i) => console.log(`   ${i + 1}. ${q}`));
     console.log();
@@ -85,7 +86,8 @@ async function main() {
 
     // Step 3: Merge Results
     console.log('💭 Generating final answer...');
-    const finalAnswer = await mergeResults(question, searchHits);
+    const mergeResult = await mergeResults(question, searchHits);
+    const finalAnswer = mergeResult.answer;
     console.log('✓ Answer ready\n');
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
