@@ -37,7 +37,13 @@ import {
   Code20Regular,
   Target20Regular,
   Library20Regular
-} from '@fluentui/react-icons';const useStyles = makeStyles({
+} from '@fluentui/react-icons';
+
+// API Configuration - use environment variables for production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const RAG_API_BASE_URL = import.meta.env.VITE_RAG_API_BASE_URL || 'http://localhost:7071';
+
+const useStyles = makeStyles({
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -350,7 +356,7 @@ export default function App() {
     setResult01({});
 
     try {
-      const response = await fetch('/api/triage', {
+      const response = await fetch(`${API_BASE_URL}/api/triage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketText }),
@@ -379,7 +385,7 @@ export default function App() {
         formData.append('image', selectedImage02);
         formData.append('question', question02);
 
-        const response = await fetch('/api/simple-rag', {
+        const response = await fetch(`${RAG_API_BASE_URL}/api/simple-rag`, {
           method: 'POST',
           body: formData,
         });
@@ -393,7 +399,7 @@ export default function App() {
         setResult02(data);
       } else if (streamingEnabled) {
         // Streaming mode
-        const response = await fetch('/api/streaming-rag', {
+        const response = await fetch(`${RAG_API_BASE_URL}/api/streaming-rag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question: question02 }),
@@ -442,7 +448,7 @@ export default function App() {
         }
       } else {
         // Non-streaming mode
-        const response = await fetch('/api/simple-rag', {
+        const response = await fetch(`${RAG_API_BASE_URL}/api/simple-rag`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question: question02 }),
@@ -467,7 +473,7 @@ export default function App() {
     setResult03({});
 
     try {
-      const response = await fetch('/api/agent-tools', {
+      const response = await fetch(`${API_BASE_URL}/api/agent-tools`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question03 }),
@@ -490,7 +496,7 @@ export default function App() {
     setResult06({});
 
     try {
-      const response = await fetch('/api/agentic-search', {
+      const response = await fetch(`${API_BASE_URL}/api/agentic-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question06 }),
@@ -563,7 +569,7 @@ export default function App() {
     setResult07({});
 
     try {
-      const response = await fetch('/api/multi-agent', {
+      const response = await fetch(`${API_BASE_URL}/api/multi-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question07 }),
