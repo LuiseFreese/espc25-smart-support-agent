@@ -20,8 +20,19 @@ import { planQueries } from './queryPlanning.js';
 import { runSearchFanout } from './searchFanout.js';
 import { mergeResults } from './mergeResults.js';
 
-// Demo 07 imports (use compiled dist folder to avoid TypeScript rootDir issues)
-import { runMultiAgentOrchestrator } from '../../../demos/07-multi-agent-orchestration/dist/index.js';
+// Demo 07 imports (optional - only works when running locally with full repo)
+let runMultiAgentOrchestrator: any = null;
+
+// Async initialization for Demo 07
+(async () => {
+    try {
+        const demo07Module = await import('../../../demos/07-multi-agent-orchestration/dist/index.js');
+        runMultiAgentOrchestrator = demo07Module.runMultiAgentOrchestrator;
+        console.log('✅ Demo 07 multi-agent orchestration loaded');
+    } catch (error) {
+        console.log('⚠️  Demo 07 not available (this is normal in cloud deployment)');
+    }
+})();
 
 // Simple rate limiter to prevent quota exhaustion
 const requestTimestamps: number[] = [];
@@ -541,6 +552,15 @@ app.post('/api/agentic-search', async (req, res) => {
 // Calls Demo 07 CLI and parses the response
 app.post('/api/multi-agent', async (req, res) => {
     try {
+        // Check if Demo 07 is available
+        if (!runMultiAgentOrchestrator) {
+            res.status(503).json({ 
+                error: 'Demo 07 (Multi-Agent Orchestration) is not available in this deployment',
+                hint: 'This demo requires the full repository context and runs best locally'
+            });
+            return;
+        }
+
         const { question } = req.body;
 
         if (!question) {
