@@ -1027,6 +1027,109 @@ if ($graphAppId) {
     Write-Host "   You may need to run: .\scripts\setup-graph-webhook.ps1 -ResourceGroup $ResourceGroup -SupportEmail $SupportEmail`n" -ForegroundColor Gray
 }
 
+# ============================================================================
+# STEP 12: Deploy Demos UI Backend (Optional)
+# ============================================================================
+
+Write-Host "`n📱 Step 12/13: Deploying Demos UI Backend to App Service..." -ForegroundColor Cyan
+
+# Check if App Service Plan exists
+$appServicePlan = az appservice plan list --resource-group $ResourceGroup --query "[?name=='asp-demos-backend'].name" -o tsv 2>$null
+
+if (-not $appServicePlan) {
+    Write-Host "  Creating App Service Plan (B1)..." -ForegroundColor Gray
+    az appservice plan create `
+        --name "asp-demos-backend" `
+        --resource-group $ResourceGroup `
+        --sku B1 `
+        --is-linux `
+        --location $Location | Out-Null
+    Write-Host "  ✅ App Service Plan created" -ForegroundColor Green
+} else {
+    Write-Host "  ℹ️  App Service Plan already exists" -ForegroundColor Gray
+}
+
+# Create Web App
+$appName = "app-demos-backend-$uniqueId"
+$existingApp = az webapp list --resource-group $ResourceGroup --query "[?name=='$appName'].name" -o tsv 2>$null
+
+if (-not $existingApp) {
+    Write-Host "  Creating Web App: $appName..." -ForegroundColor Gray
+    az webapp create `
+        --name $appName `
+        --resource-group $ResourceGroup `
+        --plan "asp-demos-backend" `
+        --runtime "NODE:20-lts" | Out-Null
+    Write-Host "  ✅ Web App created" -ForegroundColor Green
+} else {
+    Write-Host "  ℹ️  Web App already exists" -ForegroundColor Gray
+}
+
+# Enable Managed Identity
+Write-Host "  Enabling Managed Identity..." -ForegroundColor Gray
+az webapp identity assign --name $appName --resource-group $ResourceGroup | Out-Null
+
+# Get the Managed Identity principal ID
+$appPrincipalId = az webapp identity show --name $appName --resource-group $ResourceGroup --query "principalId" -o tsv
+
+# Grant Key Vault access
+Write-Host "  Granting Key Vault access..." -ForegroundColor Gray
+az role assignment create `
+    --role "Key Vault Secrets User" `
+    --assignee $appPrincipalId `
+    --scope "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.KeyVault/vaults/$keyVaultName" | Out-Null
+
+# Configure app settings with Key Vault references
+Write-Host "  Configuring environment variables..." -ForegroundColor Gray
+
+$kvUri = "https://$keyVaultName.vault.azure.net"
+az webapp config appsettings set `
+    --name $appName `
+    --resource-group $ResourceGroup `
+    --settings `
+        "AZURE_OPENAI_ENDPOINT=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-OPENAI-ENDPOINT/)" `
+        "AZURE_OPENAI_API_KEY=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-OPENAI-API-KEY/)" `
+        "AZURE_AI_SEARCH_ENDPOINT=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-AI-SEARCH-ENDPOINT/)" `
+        "AZURE_AI_SEARCH_API_KEY=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-AI-SEARCH-API-KEY/)" `
+        "PORT=8080" `
+        "WEBSITE_NODE_DEFAULT_VERSION=~20" | Out-Null
+
+# Set startup command
+az webapp config set `
+    --name $appName `
+    --resource-group $ResourceGroup `
+    --startup-file "node dist/server-unified.js" | Out-Null
+
+# Build and deploy backend
+Write-Host "  Building backend..." -ForegroundColor Gray
+Push-Location "$PSScriptRoot\..\demos-ui\backend"
+npm install --silent 2>&1 | Out-Null
+npm run build --silent 2>&1 | Out-Null
+
+# Create deployment package
+Write-Host "  Creating deployment package..." -ForegroundColor Gray
+if (Test-Path "deploy.zip") { Remove-Item "deploy.zip" -Force }
+Compress-Archive -Path dist,node_modules,package.json -DestinationPath deploy.zip -Force
+
+# Deploy
+Write-Host "  Deploying to Azure (this may take 2-3 minutes)..." -ForegroundColor Gray
+try {
+    az webapp deployment source config-zip `
+        --name $appName `
+        --resource-group $ResourceGroup `
+        --src deploy.zip `
+        --timeout 600 2>&1 | Out-Null
+    Write-Host "  ✅ Backend deployed successfully" -ForegroundColor Green
+    Write-Host "  URL: https://$appName.azurewebsites.net" -ForegroundColor Cyan
+} catch {
+    Write-Host "  ⚠️  Deployment may have timed out, but app might still be starting" -ForegroundColor Yellow
+    Write-Host "  Check status at: https://portal.azure.com" -ForegroundColor Gray
+}
+
+# Clean up
+Remove-Item "deploy.zip" -Force -ErrorAction SilentlyContinue
+Pop-Location
+
 Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "║  Deployment Complete - System Ready!                       ║" -ForegroundColor Green
 Write-Host "╚════════════════════════════════════════════════════════════╝`n" -ForegroundColor Green

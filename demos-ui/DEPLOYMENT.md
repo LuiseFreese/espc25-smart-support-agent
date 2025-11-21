@@ -146,6 +146,23 @@ VITE_API_BASE_URL=https://app-demos-backend-<uniqueid>.azurewebsites.net  # Clou
 - Verify Azure login: `az account show`
 - Check resource group exists: `az group show -n rg-smart-agents-dev`
 
+**405 Method Not Allowed / CORS Errors:**
+- **Symptom**: Browser console shows `POST /api/triage 405` or CORS blocked
+- **Cause**: Frontend using relative paths (`/api/triage`) instead of full Azure Functions URLs
+- **Fix**: 
+  1. Verify `demos-ui/frontend/.env.production` has correct URLs:
+     ```env
+     VITE_API_BASE_URL=https://func-agents-7egpzzovabxku.azurewebsites.net
+     VITE_RAG_API_BASE_URL=https://func-rag-7egpzzovabxku.azurewebsites.net
+     ```
+  2. Rebuild frontend: `cd demos-ui/frontend && npm run build`
+  3. Configure CORS on Azure Functions:
+     ```powershell
+     az functionapp cors add --name "func-agents-7egpzzovabxku" --allowed-origins "https://white-pebble-05c30d703.3.azurestaticapps.net"
+     az functionapp cors add --name "func-rag-7egpzzovabxku" --allowed-origins "https://white-pebble-05c30d703.3.azurestaticapps.net"
+     ```
+  4. Push to GitHub to trigger deployment: `git push`
+
 ## Recommended Setup for Demos
 
 1. **Deploy Frontend to Azure** (always accessible via URL)
@@ -154,3 +171,11 @@ VITE_API_BASE_URL=https://app-demos-backend-<uniqueid>.azurewebsites.net  # Clou
 4. **During Demo**: Share Azure SWA URL, audience sees production UI
 
 This hybrid approach gives you the best of both worlds: public-facing UI + flexible backend development.
+
+## Current Deployment
+
+✅ **Production URL**: https://white-pebble-05c30d703.3.azurestaticapps.net  
+✅ **Status**: Active  
+✅ **Last Updated**: 2025-11-21  
+✅ **CORS**: Configured for both function apps  
+✅ **GitHub Actions**: Auto-deployment enabled
