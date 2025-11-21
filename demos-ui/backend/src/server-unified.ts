@@ -324,13 +324,22 @@ app.post('/api/agent-tools', async (req, res) => {
 
         console.log(`[Demo 03] Running agent with question: "${question}"`);
 
-        // Spawn Demo 03 agent as a child process
-        // __dirname is demos-ui/backend/dist, so we need to go up to workspace root
+        // Check if Demo 03 is available (requires full repository context)
         const demo03Path = path.join(__dirname, '../../../demos/03-agent-with-tools/agent');
         const scriptPath = path.join(demo03Path, 'dist', 'call-agent.js');
+        
+        // Check if script exists
+        const fs = await import('fs');
+        if (!fs.existsSync(scriptPath)) {
+            console.log('⚠️  Demo 03 not available in this deployment');
+            res.status(503).json({
+                error: 'Demo 03 (Agent with Tools) is not available in this deployment',
+                hint: 'This demo requires the full repository context and runs best locally. Try running "npm run dev" in demos-ui/backend locally.'
+            });
+            return;
+        }
 
-        // Use process.execPath to get the current node executable
-        // Quote paths to handle spaces (e.g., "Program Files") in Windows
+        // Spawn Demo 03 agent as a child process
         const nodeExe = `"${process.execPath}"`;
         const quotedScriptPath = `"${scriptPath}"`;
         const childProcess = spawn(nodeExe, [quotedScriptPath, question], {

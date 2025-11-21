@@ -1,0 +1,32 @@
+[
+  {
+    "name": "AZURE_OPENAI_ENDPOINT",
+    "value": "@Microsoft.KeyVault(VaultName=kv-agents-7egpzzovabxku;SecretName=AZURE-OPENAI-ENDPOINT)",
+    "slotSetting": false
+  },
+  {
+    "name": "AZURE_OPENAI_API_KEY",
+    "value": "@Microsoft.KeyVault(VaultName=kv-agents-7egpzzovabxku;SecretName=AZURE-OPENAI-API-KEY)",
+    "slotSetting": false
+  },
+  {
+    "name": "AZURE_AI_SEARCH_ENDPOINT",
+    "value": "@Microsoft.KeyVault(VaultName=kv-agents-7egpzzovabxku;SecretName=AZURE-AI-SEARCH-ENDPOINT)",
+    "slotSetting": false
+  },
+  {
+    "name": "AZURE_AI_SEARCH_API_KEY",
+    "value": "@Microsoft.KeyVault(VaultName=kv-agents-7egpzzovabxku;SecretName=AZURE-AI-SEARCH-API-KEY)",
+    "slotSetting": false
+  },
+  {
+    "name": "PORT",
+    "value": "8080",
+    "slotSetting": false
+  },
+  {
+    "name": "WEBSITE_NODE_DEFAULT_VERSION",
+    "value": "~20",
+    "slotSetting": false
+  }
+]

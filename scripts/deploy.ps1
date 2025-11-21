@@ -1079,20 +1079,26 @@ az role assignment create `
     --assignee $appPrincipalId `
     --scope "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.KeyVault/vaults/$keyVaultName" | Out-Null
 
-# Configure app settings with Key Vault references
+# Configure app settings with direct values (same pattern as Function Apps)
+# Note: Using direct values instead of Key Vault references for better compatibility
 Write-Host "  Configuring environment variables..." -ForegroundColor Gray
 
-$kvUri = "https://$keyVaultName.vault.azure.net"
 az webapp config appsettings set `
     --name $appName `
     --resource-group $ResourceGroup `
     --settings `
-        "AZURE_OPENAI_ENDPOINT=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-OPENAI-ENDPOINT/)" `
-        "AZURE_OPENAI_API_KEY=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-OPENAI-API-KEY/)" `
-        "AZURE_AI_SEARCH_ENDPOINT=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-AI-SEARCH-ENDPOINT/)" `
-        "AZURE_AI_SEARCH_API_KEY=@Microsoft.KeyVault(SecretUri=$kvUri/secrets/AZURE-AI-SEARCH-API-KEY/)" `
+        "AZURE_OPENAI_ENDPOINT=$openaiEndpoint" `
+        "AZURE_OPENAI_API_KEY=$openaiKey" `
+        "AZURE_OPENAI_DEPLOYMENT=gpt-5-1-chat" `
+        "AZURE_AI_SEARCH_ENDPOINT=$searchEndpoint" `
+        "AZURE_AI_SEARCH_API_KEY=$searchKey" `
+        "AZURE_AI_SEARCH_INDEX=kb-support" `
+        "RAG_ENDPOINT=$ragEndpoint" `
+        "RAG_API_KEY=$ragFunctionKey" `
         "PORT=8080" `
         "WEBSITE_NODE_DEFAULT_VERSION=~20" | Out-Null
+
+Write-Host "  ✅ App settings configured" -ForegroundColor Green
 
 # Set startup command
 az webapp config set `

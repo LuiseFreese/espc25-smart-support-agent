@@ -18,8 +18,7 @@ function getClient() {
     return new AzureOpenAI({
         endpoint: process.env.AZURE_OPENAI_ENDPOINT,
         apiKey: process.env.AZURE_OPENAI_API_KEY,
-        apiVersion: '2024-08-01-preview',
-        deployment: process.env.AZURE_OPENAI_DEPLOYMENT
+        apiVersion: '2024-08-01-preview'
     });
 }
 
